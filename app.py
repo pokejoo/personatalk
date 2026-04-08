@@ -31,8 +31,8 @@ from huggingface_hub import hf_hub_download
 # KONFIGURASI
 # ============================================================================
 
-HF_REPO_ID  = "GANTI_USERNAME_HF/personatalk-models"   # ← ganti setelah buat repo HF
-GEMINI_KEY  = os.environ.get("GEMINI_API_KEY", "")      # dari Streamlit Secrets
+HF_REPO_ID  = "Jooou139/personatalk"   # ← ganti setelah buat repo HF
+GEMINI_KEY  = os.environ.get("AIzaSyDEScAvpghBP_kLZ9sOmCjdl51HmC-FoQw", "")      # dari Streamlit Secrets
 
 # ============================================================================
 # PREPROCESSING
