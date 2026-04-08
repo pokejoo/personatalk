@@ -40,9 +40,10 @@ from huggingface_hub import hf_hub_download
 # KONFIGURASI
 # ============================================================================
 
-HF_REPO_ID     = "Jooou139/personatalk-models"
+HF_REPO_ID     = "Jooou139/personatalk"
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 ANTHROPIC_KEY  = st.secrets.get("ANTHROPIC_API_KEY", "")
+HF_TOKEN       = st.secrets.get("HF_TOKEN", "")
 
 if _GENAI_OK and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -75,10 +76,11 @@ def text_preprocessing(text: str) -> str:
 @st.cache_resource(show_spinner=False)
 def load_models():
     try:
-        emo_model      = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="emo_model.pkl"))
-        emo_vectorizer = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="emo_vectorizer.pkl"))
-        mbti_model     = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="mbti_model.pkl"))
-        mbti_vectorizer= joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="mbti_vectorizer.pkl"))
+        token = HF_TOKEN if HF_TOKEN else None
+        emo_model      = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="emo_model.pkl",       token=token))
+        emo_vectorizer = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="emo_vectorizer.pkl",  token=token))
+        mbti_model     = joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="mbti_model.pkl",      token=token))
+        mbti_vectorizer= joblib.load(hf_hub_download(repo_id=HF_REPO_ID, filename="mbti_vectorizer.pkl", token=token))
         return emo_model, emo_vectorizer, mbti_model, mbti_vectorizer
     except Exception as e:
         st.error(f"❌ Gagal load model: {e}")
