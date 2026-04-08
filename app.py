@@ -304,8 +304,8 @@ def generate_ai_response(user_text: str, emotion_label: str, history: list) -> s
             result = msg.content[0].text.strip().replace("**", "").replace("##", "")
             if result:
                 return result
-        except Exception:
-            pass
+        except Exception as e:
+            st.session_state['_last_ai_error'] = f"Anthropic: {str(e)[:100]}"
 
     # === GEMINI (fallback) ===
     if _GENAI_OK and GEMINI_API_KEY:
@@ -314,53 +314,74 @@ def generate_ai_response(user_text: str, emotion_label: str, history: list) -> s
             resp   = model.generate_content(f"{SYSTEM_PROMPT}\n\n{user_prompt}")
             result = resp.text.strip().replace("**", "").replace("##", "")
             if result:
+                st.session_state['_last_ai_error'] = None  # clear error kalau Gemini berhasil
                 return result
-        except Exception:
-            pass
+        except Exception as e:
+            prev = st.session_state.get('_last_ai_error', '')
+            st.session_state['_last_ai_error'] = (prev or '') + f" | Gemini: {str(e)[:100]}"
 
     return None
 
-def fallback_response(text: str, emotion: int) -> str:
-    t = text.lower()
-    if any(w in t for w in ['putus','selingkuh','ditinggal','diputus','diselingkuhin']):
+def fallback_response(text: str, emotion: int, history: list = None) -> str:
+    """Fallback yang context-aware — baca history kalau pesan pendek/nggak informatif."""
+    t = text.lower().strip()
+
+    # Kalau pesan sangat pendek (< 4 kata), cari konteks dari history
+    full_context = t
+    if len(t.split()) < 4 and history:
+        # Gabung beberapa pesan user terakhir untuk konteks
+        user_msgs = [m['content'].lower() for m in history if m['role'] == 'user']
+        full_context = ' '.join(user_msgs[-4:])
+
+    fc = full_context  # shorthand
+
+    if any(w in fc for w in ['putus','selingkuh','ditinggal','diputus','diselingkuhin','dikhianatin']):
         opts = [
-            'Aduh, itu pasti nyakitin banget... putus ditambah selingkuh tuh double sakit ya. Gimana kondisi kamu sekarang, masih shock atau udah bisa napas dikit?',
-            'Ya Allah, itu berat banget. Dikhianatin sama orang yang kamu percaya... wajar banget kalau sekarang rasanya hancur. Udah cerita ke siapa belum?',
+            'Aduh, 2 tahun itu bukan waktu yang sebentar... pasti banyak banget kenangan yang bikin ini makin berat. Sekarang kamu lagi di mana, sendirian atau sama seseorang?',
+            'Duh, diselingkuhin setelah 2 tahun itu nyakitin banget. Kamu masih sering kepikiran dia nggak?',
+            'Ya Allah, itu berat banget. Wajar kalau sekarang rasanya campur aduk — marah, sedih, bingung semuanya barengan. Gimana kondisi kamu hari ini?',
         ]
-    elif any(w in t for w in ['bingung','harus apa','mau ngapain','ga ada','nggak ada','tanpa dia']):
+    elif any(w in fc for w in ['bingung','harus apa','mau ngapain','ga ada','nggak ada','tanpa dia','belum']):
+        # "belum" dalam konteks putus/selingkuh = belum cerita ke siapa-siapa
+        if any(w in fc for w in ['putus','selingkuh','ditinggal','cerita']):
+            opts = [
+                'Iya, kadang susah nyari orang yang bisa beneran dengerin ya. Kamu udah berapa lama nahan ini sendirian?',
+                'Nggak apa-apa, aku di sini kok. Mau cerita lebih detail — gimana awalnya kamu tau dia selingkuh?',
+            ]
+        else:
+            opts = [
+                'Hmm, ngerasa kayak tiba-tiba harus jalan sendiri dan bingung mulai dari mana ya? Kamu udah lama sama dia?',
+                'Kehilangan seseorang yang udah jadi bagian besar dari hidup tuh emang bikin kosong. Yang paling bikin kamu kepikiran sekarang apa?',
+            ]
+    elif any(w in fc for w in ['capek','lelah','exhausted','burnout']):
         opts = [
-            'Hmm, ngerasa kayak tiba-tiba harus jalan sendiri dan bingung mulai dari mana ya? Itu wajar banget. Kamu udah lama sama dia?',
-            'Kehilangan seseorang yang udah jadi bagian besar dari hidup tuh emang bikin kosong. Yang paling bikin kamu kepikiran sekarang apa?',
+            'Hmm, capek yang kayak gini beda sama capek biasa. Ini capek dari mana — fisik, pikiran, atau keduanya?',
+            'Ngerasa kelelahan kayak gini tanda kamu udah ngasih banyak banget. Udah berapa lama ngerasa kayak gini?',
         ]
-    elif any(w in t for w in ['capek','lelah','exhausted','burnout']):
-        opts = [
-            'Hmm, capek yang kayak gini beda sama capek biasa. Ini capek dari mana — fisik, pikiran, atau keduanya sekaligus?',
-            'Ngerasa kelelahan kayak gini tuh tanda kamu udah ngasih banyak banget. Udah berapa lama ngerasa kayak gini?',
-        ]
-    elif any(w in t for w in ['suka','naksir','gebetan','pdkt','cantik','ganteng','kangen']):
+    elif any(w in fc for w in ['suka','naksir','gebetan','pdkt','cantik','ganteng','kangen']):
         opts = [
             'Wah, ada yang spesial nih kayaknya! Cerita dong lebih — udah lama kenal?',
             'Ooh, menarik! Dia tau nggak kalau kamu naksir? Atau masih tahap ngira-ngira?',
         ]
     elif emotion == 3:
         opts = [
-            'Iya aku ngerti, situasi kayak gitu emang bikin darah naik. Boleh cerita lebih — ini karena apa atau siapa?',
-            'Wajar banget kesel. Kemarahan itu sering jadi sinyal kalau ada sesuatu yang beneran nggak beres. Udah lama nahan ini?',
+            'Iya aku ngerti, situasi kayak gitu emang bikin darah naik. Boleh cerita lebih — ini karena apa?',
+            'Wajar banget kesel. Kemarahan itu sering sinyal kalau ada yang beneran nggak beres. Udah lama nahan ini?',
         ]
     elif emotion == 4:
         opts = [
-            'Hmm, ngerasa cemas itu nggak enak banget ya, kayak ada beban terus. Ini soal apa yang paling bikin kamu khawatir?',
+            'Hmm, ngerasa cemas itu nggak enak banget ya. Ini soal apa yang paling bikin kamu khawatir?',
             'Overthinking paling susah dimatiin emang. Kamu cemas soal hal yang udah terjadi atau yang belum?',
         ]
-    elif emotion == 1:
+    elif emotion == 0:
         opts = [
-            'Wah, energinya positif banget nih! Ada kabar baik? Cerita dong!',
-            'Seneng banget denger kamu lagi happy! Ada hal spesial yang terjadi hari ini?',
+            'Duh, kedengarannya berat banget... cerita lebih dong, aku dengerin.',
+            'Hmm, ada yang lagi dipikirin nih. Mau cerita dari mana dulu?',
         ]
     else:
         opts = [
             'Hmm, cerita lebih yuk. Aku dengerin kok — ada apa?',
-            'Duh, kedengarannya ada yang lagi dipikirin nih. Mau cerita dari mana dulu?',
+            'Duh, kayaknya ada yang lagi dipikirin nih. Mau cerita lebih?',
         ]
     return random.choice(opts)
 
@@ -612,6 +633,19 @@ def main():
                 del st.session_state[k]
             st.rerun()
 
+        # Debug: tampilkan status AI (bisa dihapus setelah presentasi)
+        ai_err = st.session_state.get('_last_ai_error')
+        if ai_err:
+            st.markdown("---")
+            st.markdown(f'<span style="color:#e74c3c;font-size:0.75rem;">⚠️ {ai_err}</span>', unsafe_allow_html=True)
+        else:
+            if ANTHROPIC_KEY:
+                st.markdown('<span style="color:#00ffc8;font-size:0.75rem;">🟢 Claude AI aktif</span>', unsafe_allow_html=True)
+            elif GEMINI_API_KEY:
+                st.markdown('<span style="color:#f39c12;font-size:0.75rem;">🟡 Gemini AI aktif</span>', unsafe_allow_html=True)
+            else:
+                st.markdown('<span style="color:#e74c3c;font-size:0.75rem;">🔴 AI tidak aktif — cek Secrets</span>', unsafe_allow_html=True)
+
     # ── Chat display ──────────────────────────────────────────────────────────
     for msg in st.session_state.messages:
         is_user = msg['role'] == 'user'
@@ -663,7 +697,7 @@ def main():
             if response and response in st.session_state.last_bot_responses[-3:]:
                 response = None
             if not response:
-                response = fallback_response(user_text, emotion)
+                response = fallback_response(user_text, emotion, st.session_state.messages)
 
             st.session_state.last_bot_responses.append(response)
             if len(st.session_state.last_bot_responses) > 10:
