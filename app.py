@@ -1,8 +1,6 @@
 """
-🐼 PersonaTalk — Streamlit App
-UI: Native Streamlit — st.chat_message + st.chat_input
-Don't fight the framework.
-Claude PRIMARY · Gemini FALLBACK
+🐼 PersonaTalk — Portfolio Style with AI Chat
+UI: Streamlit with custom CSS, chat as popup/modal
 """
 
 import streamlit as st
@@ -390,7 +388,6 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</svg>'
     )
 
-    # legend rows
     rows = ""
     for i in range(6):
         if pcts[i] < 0.01: continue
@@ -411,118 +408,158 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</div>'
     )
 
-# ── CSS — minimal, only colors + font, no layout hacks ───────────────────────
+# ── CSS Portfolio Style ──────────────────────────────────────────────────────
 def inject_css():
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
 
-/* App */
-.stApp { background: #f1f5f9 !important; }
-.main > div { background: transparent !important; max-width: 860px; }
+/* Background gradien lembut */
+.stApp { background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%) !important; }
 
-/* Hide chrome — keep collapsedControl so sidebar can reopen */
+/* Main container padding */
+.main > div { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; }
+
+/* Hide default Streamlit elements */
 #MainMenu, footer, header { visibility: hidden !important; }
 [data-testid="stToolbar"] { display: none !important; }
 
-/* Sidebar */
+/* Hero section styling */
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: #64748b;
+    margin-bottom: 1.5rem;
+}
+
+/* Skill cards */
+.skill-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem 1.2rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: all 0.2s ease;
+}
+.skill-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+    border-color: #cbd5e1;
+}
+
+/* Chat bubble styling - floating di kanan bawah */
+.chat-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+.chat-toggle {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    border: none;
+    border-radius: 60px;
+    padding: 14px 20px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+    transition: all 0.2s;
+}
+.chat-toggle:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(59,130,246,0.4);
+}
+.chat-panel {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 380px;
+    height: 500px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    z-index: 999;
+}
+.chat-header {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: white;
+    padding: 12px 16px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #f8fafc;
+}
+.chat-input-area {
+    padding: 12px;
+    border-top: 1px solid #e2e8f0;
+    background: white;
+}
+.chat-input-area input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    font-size: 13px;
+}
+
+/* Untuk menampilkan chat messages di panel */
+.chat-bubble-user {
+    background: #eff6ff;
+    padding: 8px 12px;
+    border-radius: 18px;
+    margin: 8px 0;
+    max-width: 85%;
+    margin-left: auto;
+    color: #1e293b;
+    font-size: 13px;
+}
+.chat-bubble-bot {
+    background: white;
+    padding: 8px 12px;
+    border-radius: 18px;
+    margin: 8px 0;
+    max-width: 85%;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+    font-size: 13px;
+}
+
+/* Sidebar styling */
 section[data-testid="stSidebar"] {
-    background: #ffffff !important;
+    background: rgba(255,255,255,0.95) !important;
+    backdrop-filter: blur(10px);
     border-right: 1px solid #e2e8f0 !important;
 }
-section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] .stMarkdown { color: #334155 !important; }
-section[data-testid="stSidebar"] hr { border-color: #e2e8f0 !important; }
-section[data-testid="stSidebar"] .stButton > button {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 10px !important;
-    color: #475569 !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    padding: 8px 12px !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: 36px !important;
-    transition: background .15s !important;
-}
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: #f1f5f9 !important;
-    color: #1e293b !important;
-}
-
-/* Chat messages — CRITICAL: don't override text color globally */
-[data-testid="stChatMessage"] {
-    background: white !important;
-    border: 1px solid #f1f5f9 !important;
-    border-radius: 16px !important;
-    padding: 14px 16px !important;
-    margin-bottom: 8px !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
-}
-
-/* Ensure chat text is always visible */
-[data-testid="stChatMessage"] p,
-[data-testid="stChatMessage"] span,
-[data-testid="stChatMessage"] div {
-    color: #1e293b !important;
-}
-
-/* User message — blue tint */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: #eff6ff !important;
-    border-color: #dbeafe !important;
-}
-
-/* Chat input */
-[data-testid="stChatInput"] textarea {
-    border-radius: 24px !important;
-    border: 1.5px solid #e2e8f0 !important;
-    background: white !important;
-    font-size: 14px !important;
-    padding: 12px 18px !important;
-    color: #1e293b !important;
-}
-[data-testid="stChatInput"] textarea:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
-}
-[data-testid="stChatInputSubmitButton"] button {
-    background: #3b82f6 !important;
-    border-radius: 50% !important;
-    color: white !important;
-}
-
-/* Metric cards */
-[data-testid="stMetric"] {
-    background: white !important;
-    border-radius: 14px !important;
-    padding: 14px 16px !important;
-    border: 1px solid #f1f5f9 !important;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
-}
-[data-testid="stMetricValue"] { color: #1e293b !important; font-size: 1.3rem !important; }
-[data-testid="stMetricLabel"] { color: #64748b !important; font-size: 12px !important; }
-
-/* Progress */
-.stProgress > div > div > div > div { background: linear-gradient(90deg,#3b82f6,#6366f1) !important; border-radius: 99px !important; }
-.stProgress > div > div > div { background: #e2e8f0 !important; border-radius: 99px !important; }
-
-/* Selectbox / radio */
-div[role="radiogroup"] label { color: #475569 !important; font-size: 13px !important; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 </style>
+
+<script>
+// Simple chat toggle (will be handled by Streamlit state)
+</script>
 """, unsafe_allow_html=True)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     st.set_page_config(
-        page_title="PersonaTalk",
+        page_title="PersonaTalk Portfolio",
         page_icon="🐼",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -538,216 +575,136 @@ def main():
         'emotion':    1, 'confidence': 0.5, 'mbti': None, 'mbti_texts': [],
         'mode':       'curhat', 'q_idx': -1, 'q_resp': [],
         'last_bot':   [], 'emo_counts': {i:0 for i in range(6)},
-        '_provider':  None, '_ai_err': None,
+        '_provider':  None, '_ai_err': None, 'chat_open': True,
     }.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
     emo_id = st.session_state.emotion
 
-    # ── Sidebar ───────────────────────────────────────────────────────────────
+    # ── Sidebar (minimal, only analytics) ───────────────────────────────────
     with st.sidebar:
-        # Logo
         st.markdown(
-            '<div style="display:flex;align-items:center;gap:10px;padding:20px 16px 12px;">'
-            '<div style="width:34px;height:34px;background:linear-gradient(135deg,#3b82f6,#6366f1);'
-            'border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;">🐼</div>'
-            '<div style="font-weight:700;font-size:15px;color:#0f172a;">PersonaTalk</div>'
+            '<div style="text-align:center;padding:20px 0 10px;">'
+            '<div style="font-size:48px;">🐼</div>'
+            '<div style="font-weight:700;font-size:18px;color:#1e293b;">PersonaTalk</div>'
+            '<div style="font-size:12px;color:#64748b;">AI Mental Wellness Companion</div>'
             '</div>',
             unsafe_allow_html=True,
         )
-
         st.markdown("---")
-
-        # Mode selector — native radio
-        mode_sel = st.radio(
-            "Mode",
-            ["💬 Curhat", "🔮 Analisis MBTI"],
-            index=0 if st.session_state.mode == 'curhat' else 1,
-            label_visibility="collapsed",
-        )
-        new_mode = 'curhat' if '💬' in mode_sel else 'mbti'
-        if new_mode != st.session_state.mode:
-            st.session_state.mode  = new_mode
-            st.session_state.q_idx = -1
-            st.session_state.q_resp = []
-            st.rerun()
-
+        
+        # Mood analytics
+        st.markdown("### 📊 Mood Analytics")
+        st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
+        
         st.markdown("---")
+        if st.session_state.mbti:
+            st.markdown(f"**🧬 MBTI:** `{st.session_state.mbti}`")
+        
+        st.markdown("---")
+        status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
+        st.caption(f"AI Status: {status}")
 
-        # Mood card
-        st.markdown(
-            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:.1em;color:#94a3b8;margin-bottom:10px;padding:0 4px;">Mood Terdeteksi</div>',
-            unsafe_allow_html=True,
-        )
+    # ── MAIN CONTENT: Portfolio Style ────────────────────────────────────────
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown('<div class="hero-title">Hi, I\'m PersonaTalk</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-subtitle">Your AI friend who listens without judgment. 💙</div>', unsafe_allow_html=True)
+        
+        # About section
+        st.markdown("### About Me")
+        st.markdown("""
+        PersonaTalk is designed to be a genuine companion — not a therapist, not a bot, 
+        but a friend who's always there to listen. Whether you're happy, sad, confused, 
+        or just need someone to talk to, I'm here.
+        """)
+        
+        # Skills/Features as cards
+        st.markdown("### What I Can Do")
+        cols = st.columns(3)
+        features = [
+            ("🧠", "Emotion Detection", "Understands how you feel"),
+            ("📊", "MBTI Analysis", "Discovers your personality"),
+            ("💬", "Natural Chat", "Feels like talking to a friend"),
+        ]
+        for i, (icon, title, desc) in enumerate(features):
+            with cols[i]:
+                st.markdown(f"""
+                <div class="skill-card">
+                    <div style="font-size:28px;">{icon}</div>
+                    <div style="font-weight:600;margin:8px 0 4px;">{title}</div>
+                    <div style="font-size:12px;color:#64748b;">{desc}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Current mood indicator
+        st.markdown("### Current Mood")
         emo_label = EMO_LABEL.get(emo_id, 'Netral')
         emo_emoji = EMO_EMOJI.get(emo_id, '😊')
-        emo_color = EMO_COLOR.get(emo_id, '#3b82f6')
-        conf_pct  = int(st.session_state.confidence * 100)
-        st.markdown(
-            f'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;'
-            f'padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.5rem;">{emo_emoji}</span>'
-            f'<div><div style="font-weight:600;font-size:14px;color:{emo_color};">{emo_label}</div>'
-            f'<div style="font-size:11px;color:#94a3b8;">{conf_pct}% confidence</div></div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+        st.info(f"{emo_emoji} **{emo_label}** detected · {int(st.session_state.confidence*100)}% confidence")
 
-        # Donut chart
-        st.markdown(
-            '<div style="font-size:10px;font-weight:700;text-transform:uppercase;'
-            'letter-spacing:.1em;color:#94a3b8;margin-bottom:10px;padding:0 4px;">Distribusi Mood</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        # MBTI
-        if st.session_state.mbti:
-            st.markdown(
-                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;'
-                'letter-spacing:.1em;color:#94a3b8;margin-bottom:8px;padding:0 4px;">Tipe MBTI</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div style="background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:12px;'
-                f'padding:10px;text-align:center;font-weight:700;font-size:1.2rem;color:white;'
-                f'margin-bottom:12px;">{st.session_state.mbti}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption("🧬 MBTI terdeteksi otomatis dari chat")
-
-        st.markdown("---")
-
-        # AI status
-        status_map = {'claude':'🟢 Claude aktif','gemini':'🟡 Gemini aktif','error':'🔴 Error','none':'⚪ Siap'}
-        st.caption(status_map.get(
-            'error' if st.session_state['_ai_err'] else (st.session_state['_provider'] or 'none'),
-            '⚪ Siap'
-        ))
-
-        if st.session_state['_ai_err']:
-            st.markdown(
-                f'<div style="font-size:10px;color:#ef4444;word-break:break-all;">'
-                f'⚠️ {st.session_state["_ai_err"][:120]}</div>',
-                unsafe_allow_html=True,
-            )
-
-        # Reset
-        if st.button("🔄 Reset Chat", use_container_width=True):
-            for k in list(st.session_state.keys()):
-                del st.session_state[k]
-            st.rerun()
-
-    # =========================================================================
-    # MAIN AREA
-    # =========================================================================
-
-    # ── Header ────────────────────────────────────────────────────────────────
-    mode_label = "Curhat" if st.session_state.mode == 'curhat' else "Analisis MBTI"
-    st.markdown(
-        f'<div style="padding:8px 0 4px;">'
-        f'<div style="font-size:1.4rem;font-weight:700;color:#0f172a;">🐼 PersonaTalk</div>'
-        f'<div style="font-size:13px;color:#64748b;">Mode: {mode_label} · '
-        f'{EMO_EMOJI.get(emo_id,"😊")} {EMO_LABEL.get(emo_id,"Bahagia")}</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    with col2:
+        st.markdown("### Quick Stats")
+        st.metric("Total Chats", len([m for m in st.session_state.messages if m['role']=='user']))
+        st.metric("MBTI Status", st.session_state.mbti if st.session_state.mbti else "Analyzing...")
+        st.metric("AI Provider", st.session_state['_provider'] or "Ready")
 
     # Divider
-    st.markdown('<hr style="border:none;border-top:1px solid #e2e8f0;margin:8px 0 16px;">', unsafe_allow_html=True)
-
-    # MBTI progress bar
-    if st.session_state.mode == 'mbti' and st.session_state.q_idx >= 0:
-        total = len(MBTI_Q)
-        st.progress(min((st.session_state.q_idx + 1) / total, 1.0))
-        st.caption(f"Pertanyaan {st.session_state.q_idx + 1} dari {total}")
-
-    # ── Chat messages — native st.chat_message() ──────────────────────────────
-    for msg in st.session_state.messages:
-        is_user = msg['role'] == 'user'
-        avatar  = '👤' if is_user else EMO_ICON.get(emo_id, '🐼')
-        role    = 'user' if is_user else 'assistant'
-        with st.chat_message(role, avatar=avatar):
-            st.markdown(msg['content'])
-
-    # ── Input — native st.chat_input() ───────────────────────────────────────
-    ph = "Ketik pesan..." if st.session_state.mode == 'curhat' else "Jawab A atau B..."
-    user_text = st.chat_input(ph)
-
-    # ── Handle input ─────────────────────────────────────────────────────────
-    if user_text and user_text.strip():
-        user_text = user_text.strip()
-        st.session_state.messages.append({'role': 'user', 'content': user_text})
-
-        # Show user message immediately
-        with st.chat_message('user', avatar='👤'):
-            st.write(user_text)
-
-        if st.session_state.mode == 'curhat':
+    st.markdown("---")
+    
+    # Mini chat preview
+    st.markdown("### 💬 Recent Chat")
+    last_msgs = st.session_state.messages[-4:] if len(st.session_state.messages) > 4 else st.session_state.messages
+    for msg in last_msgs[-3:]:
+        if msg['role'] == 'user':
+            st.markdown(f'<div style="background:#eff6ff;padding:8px 12px;border-radius:12px;margin:4px 0;"><span style="font-weight:500;">👤 You:</span> {msg["content"][:100]}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="background:white;padding:8px 12px;border-radius:12px;margin:4px 0;border:1px solid #e2e8f0;"><span style="font-weight:500;">🐼 PersonaTalk:</span> {msg["content"][:100]}</div>', unsafe_allow_html=True)
+    
+    # Full chat button
+    if st.button("💬 Open Full Chat", use_container_width=True):
+        st.session_state.chat_open = not st.session_state.chat_open
+        st.rerun()
+    
+    # ── Full Chat Modal (if open) ───────────────────────────────────────────
+    if st.session_state.chat_open:
+        st.markdown("---")
+        st.markdown("### 💬 Chat with PersonaTalk")
+        
+        # Display chat messages
+        for msg in st.session_state.messages:
+            if msg['role'] == 'user':
+                with st.chat_message("user", avatar="👤"):
+                    st.write(msg['content'])
+            else:
+                with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
+                    st.write(msg['content'])
+        
+        # Chat input
+        user_text = st.chat_input("Ketik pesan...")
+        
+        if user_text and user_text.strip():
+            user_text = user_text.strip()
+            st.session_state.messages.append({'role': 'user', 'content': user_text})
+            
             emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
-            st.session_state.emotion    = emo_id
+            st.session_state.emotion = emo_id
             st.session_state.confidence = conf
             st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
-
+            
             mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
             if mbti_p and mbti_c > 0.3:
                 st.session_state.mbti = mbti_p
-
-            # Show typing indicator
-            with st.chat_message('assistant', avatar=EMO_ICON.get(emo_id, '🐼')):
-                with st.spinner(""):
-                    response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
-
+            
+            response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
             if not response:
                 response = fallback_response(user_text, emo_id, st.session_state.messages)
-                if is_dup(response, st.session_state.last_bot):
-                    for opt in random.sample(
-                        ["Hmm, gimana kamu ngerasa sekarang?","Ooh, mau cerita lebih?",
-                         "Duh, ada yang bisa aku bantu?","Aduh, lanjutin dong.",
-                         "Wah, gimana kelanjutannya?"], 5
-                    ):
-                        if not is_dup(opt, st.session_state.last_bot):
-                            response = opt; break
-
+            
             st.session_state.last_bot.append(response)
-            if len(st.session_state.last_bot) > 10:
-                st.session_state.last_bot.pop(0)
-
-        else:  # MBTI mode
-            if st.session_state.q_idx == -1:
-                st.session_state.q_resp = []
-                st.session_state.q_idx  = 0
-                q = MBTI_Q[0]
-                response = (f"Oke, yuk mulai analisis kepribadianmu! 🎯\n\n"
-                            f"**Pertanyaan 1 dari {len(MBTI_Q)}:**\n\n{q['q']}\n\n"
-                            f"**A.** {q['A']}\n**B.** {q['B']}\n\nJawab A atau B ya 😊")
-            else:
-                ans = user_text.strip().upper()
-                if ans in ['A', 'B']:
-                    cq  = MBTI_Q[st.session_state.q_idx]
-                    st.session_state.q_resp.append({"qid": cq["id"], "ans": ans})
-                    nxt = st.session_state.q_idx + 1
-                    if nxt < len(MBTI_Q):
-                        st.session_state.q_idx = nxt
-                        q = MBTI_Q[nxt]
-                        response = (f"**Pertanyaan {q['id']} dari {len(MBTI_Q)}:**\n\n{q['q']}\n\n"
-                                    f"**A.** {q['A']}\n**B.** {q['B']}\n\nJawab A atau B ya 😊")
-                    else:
-                        mtype = analyze_mbti(st.session_state.q_resp)
-                        st.session_state.mbti  = mtype
-                        st.session_state.q_idx = -1
-                        response = f"✨ Analisis selesai!\n\n{fmt_mbti(mtype)}\n\n---\nPindah ke mode Curhat kalau mau ngobrol santai 😊"
-                else:
-                    response = "Jawabnya **A** atau **B** aja ya 😄 Coba lagi!"
-
-        st.session_state.messages.append({'role': 'bot', 'content': response})
-        st.rerun()
-
+            st.session_state.messages.append({'role': 'bot', 'content': response})
+            st.rerun()
 
 if __name__ == "__main__":
     main()
