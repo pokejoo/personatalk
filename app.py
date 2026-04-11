@@ -1,6 +1,6 @@
 """
-🐼 PersonaTalk — 3D Interactive Style with Three.js background
-UI: Full-screen 3D canvas + chat overlay
+🐼 PersonaTalk — Portfolio Style with AI Chat
+UI: Streamlit with custom CSS, chat as popup/modal
 """
 
 import streamlit as st
@@ -360,7 +360,6 @@ def mood_donut_html(emo_counts: dict) -> str:
     emojis   = ['😢','😊','😍','😤','😰','😲']
 
     r, cx, cy  = 38, 50, 50
-    inner_r    = 24
     paths, off = "", 0.0
     for i, pct in enumerate(pcts):
         if pct < 0.005:
@@ -377,14 +376,14 @@ def mood_donut_html(emo_counts: dict) -> str:
         off += pct
 
     if not has_data:
-        paths = f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="#e2e8f0"/>'
+        paths = f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="#bfdbfe"/>'
 
     svg = (
         f'<svg viewBox="0 0 100 100" width="90" height="90">'
         f'{paths}'
-        f'<circle cx="{cx}" cy="{cy}" r="{inner_r}" fill="white"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="24" fill="white"/>'
         f'<text x="{cx}" y="{cy-4}" text-anchor="middle" font-size="13">{emojis[dominant]}</text>'
-        f'<text x="{cx}" y="{cy+11}" text-anchor="middle" fill="#1e40af" font-size="9" font-weight="bold">{dom_pct}%</text>'
+        f'<text x="{cx}" y="{cy+11}" text-anchor="middle" fill="#1d4ed8" font-size="9" font-weight="bold">{dom_pct}%</text>'
         f'</svg>'
     )
 
@@ -394,12 +393,12 @@ def mood_donut_html(emo_counts: dict) -> str:
         rows += (
             f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
             f'<div style="width:8px;height:8px;border-radius:50%;background:{colors[i]};flex-shrink:0;"></div>'
-            f'<span style="font-size:12px;color:#475569;flex:1;">{EMO_LABEL[i]}</span>'
-            f'<span style="font-size:12px;color:#94a3b8;">{int(pcts[i]*100)}%</span>'
+            f'<span style="font-size:12px;color:#1e3a5f;flex:1;">{EMO_LABEL[i]}</span>'
+            f'<span style="font-size:12px;color:#3b82f6;">{int(pcts[i]*100)}%</span>'
             f'</div>'
         )
     if not rows:
-        rows = '<span style="font-size:12px;color:#94a3b8;">Mulai chat untuk analisis</span>'
+        rows = '<span style="font-size:12px;color:#3b82f6;">Mulai chat untuk analisis</span>'
 
     return (
         f'<div style="display:flex;align-items:center;gap:14px;">'
@@ -408,157 +407,274 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</div>'
     )
 
-# ── CSS 3D Style (Glassmorphism + floating elements) ─────────────────────────
+# ── CSS — Blue Theme, High Contrast ──────────────────────────────────────────
 def inject_css():
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
 }
 
-/* Fullscreen 3D background container */
+/* ── Background biru muda bersih ── */
 .stApp {
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e) !important;
-    position: relative;
-    overflow-x: hidden;
+    background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 50%, #e0f2fe 100%) !important;
+}
+
+/* ── Semua teks default gelap ── */
+.stApp, .stApp p, .stApp div, .stApp span, .stApp label {
+    color: #1e3a5f !important;
+}
+
+/* Main container */
+.main > div {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
 }
 
 /* Hide default Streamlit elements */
 #MainMenu, footer, header { visibility: hidden !important; }
 [data-testid="stToolbar"] { display: none !important; }
 
-/* Glassmorphism chat container */
-.glass-chat {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    padding: 20px;
-    margin: 20px auto;
-    max-width: 800px;
-}
-
-/* Chat messages */
-[data-testid="stChatMessage"] {
-    background: rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 20px !important;
-    padding: 12px 16px !important;
-    margin-bottom: 12px !important;
-}
-
-[data-testid="stChatMessage"] p,
-[data-testid="stChatMessage"] span,
-[data-testid="stChatMessage"] div {
-    color: #f1f5f9 !important;
-}
-
-/* User message */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: rgba(59, 130, 246, 0.2) !important;
-    border-color: rgba(59, 130, 246, 0.3) !important;
-}
-
-/* Chat input */
-[data-testid="stChatInput"] textarea {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 28px !important;
-    color: white !important;
-}
-
-[data-testid="stChatInput"] textarea::placeholder {
-    color: rgba(255, 255, 255, 0.5) !important;
-}
-
-[data-testid="stChatInputSubmitButton"] button {
-    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
-    border-radius: 50% !important;
-}
-
-/* Sidebar glass */
-section[data-testid="stSidebar"] {
-    background: rgba(15, 23, 42, 0.7) !important;
-    backdrop-filter: blur(16px) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-section[data-testid="stSidebar"] * {
-    color: #e2e8f0 !important;
-}
-
-/* Metric cards */
-[data-testid="stMetric"] {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-radius: 16px !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-[data-testid="stMetricValue"] { color: #f1f5f9 !important; }
-[data-testid="stMetricLabel"] { color: #94a3b8 !important; }
-
-/* Title styling */
-.glow-text {
-    text-align: center;
+/* ── Hero title ── */
+.hero-title {
     font-size: 3rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #ffffff, #a855f7, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+    color: #1d4ed8 !important;
+    -webkit-text-fill-color: #1d4ed8 !important;
+    margin-bottom: 0.25rem;
+    line-height: 1.15;
+}
+.hero-subtitle {
+    font-size: 1.05rem;
+    color: #2563eb !important;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
 }
 
-/* Button */
-.stButton > button {
-    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
-    border: none !important;
-    border-radius: 40px !important;
-    color: white !important;
+/* ── Section headings (h3 dari st.markdown) ── */
+h1, h2, h3, h4 {
+    color: #1d4ed8 !important;
+    font-weight: 700 !important;
+}
+
+/* ── About text ── */
+.about-text {
+    color: #1e3a5f !important;
+    font-size: 0.97rem;
+    line-height: 1.65;
+    background: white;
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    border: 1px solid #bfdbfe;
+}
+
+/* ── Skill cards ── */
+.skill-card {
+    background: white !important;
+    border-radius: 16px;
+    padding: 1.1rem 1.2rem;
+    border: 1.5px solid #bfdbfe;
+    box-shadow: 0 2px 10px rgba(59,130,246,0.08);
+    transition: all 0.2s ease;
+    min-height: 110px;
+}
+.skill-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(59,130,246,0.15);
+    border-color: #3b82f6;
+}
+.skill-card .icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+}
+.skill-card .title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #1d4ed8 !important;
+    margin-bottom: 4px;
+}
+.skill-card .desc {
+    font-size: 0.82rem;
+    color: #2563eb !important;
+}
+
+/* ── Quick stats cards ── */
+.stat-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1rem 1.2rem;
+    border: 1.5px solid #bfdbfe;
+    box-shadow: 0 2px 8px rgba(59,130,246,0.07);
+    margin-bottom: 12px;
+    text-align: center;
+}
+.stat-label {
+    font-size: 0.78rem;
+    color: #2563eb !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+}
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1d4ed8 !important;
+}
+
+/* ── Streamlit metric override ── */
+[data-testid="stMetricValue"] {
+    color: #1d4ed8 !important;
+    font-weight: 800 !important;
+}
+[data-testid="stMetricLabel"] {
+    color: #2563eb !important;
     font-weight: 600 !important;
-    padding: 8px 20px !important;
+}
+
+/* ── st.info box ── */
+[data-testid="stAlert"] {
+    background: #eff6ff !important;
+    border: 1.5px solid #93c5fd !important;
+    color: #1e3a5f !important;
+    border-radius: 12px !important;
+}
+[data-testid="stAlert"] p {
+    color: #1e3a5f !important;
+}
+
+/* ── Chat bubbles ── */
+.chat-bubble-user {
+    background: #dbeafe;
+    border: 1px solid #93c5fd;
+    padding: 10px 14px;
+    border-radius: 18px 18px 4px 18px;
+    margin: 6px 0;
+    max-width: 88%;
+    margin-left: auto;
+    color: #1e3a5f !important;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.chat-bubble-bot {
+    background: white;
+    border: 1.5px solid #bfdbfe;
+    padding: 10px 14px;
+    border-radius: 18px 18px 18px 4px;
+    margin: 6px 0;
+    max-width: 88%;
+    color: #1e3a5f !important;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: 0 1px 4px rgba(59,130,246,0.07);
+}
+
+/* ── Recent chat preview bubbles ── */
+.preview-bubble-user {
+    background: #dbeafe;
+    padding: 8px 14px;
+    border-radius: 12px;
+    margin: 5px 0;
+    color: #1e3a5f !important;
+    font-size: 13px;
+    border-left: 3px solid #3b82f6;
+}
+.preview-bubble-bot {
+    background: white;
+    padding: 8px 14px;
+    border-radius: 12px;
+    margin: 5px 0;
+    color: #1e3a5f !important;
+    font-size: 13px;
+    border: 1px solid #bfdbfe;
+    border-left: 3px solid #93c5fd;
+}
+.bubble-label {
+    font-weight: 700;
+    font-size: 11px;
+    color: #1d4ed8 !important;
+    margin-bottom: 2px;
+}
+
+/* ── Open Full Chat button ── */
+.stButton > button {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    padding: 0.6rem 1.2rem !important;
+    box-shadow: 0 4px 14px rgba(29,78,216,0.3) !important;
     transition: all 0.2s !important;
 }
 .stButton > button:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(29,78,216,0.4) !important;
 }
 
-/* Floating particles animation */
-@keyframes float {
-    0% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
-    50% { transform: translateY(-20px) rotate(180deg); opacity: 0.3; }
-    100% { transform: translateY(0px) rotate(360deg); opacity: 0.6; }
+/* ── Chat input ── */
+[data-testid="stChatInput"] textarea {
+    background: white !important;
+    color: #1e3a5f !important;
+    border: 1.5px solid #93c5fd !important;
+    border-radius: 24px !important;
+    font-size: 14px !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #60a5fa !important;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+/* ── Chat messages ── */
+[data-testid="stChatMessage"] {
+    background: white !important;
+    border: 1px solid #bfdbfe !important;
+    border-radius: 16px !important;
+    padding: 4px 8px !important;
+    margin: 4px 0 !important;
+}
+[data-testid="stChatMessage"] p {
+    color: #1e3a5f !important;
+}
+
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%) !important;
+    border-right: 1.5px solid #bfdbfe !important;
+}
+section[data-testid="stSidebar"] * {
+    color: #1e3a5f !important;
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    color: #1d4ed8 !important;
+}
+section[data-testid="stSidebar"] .stCaption {
+    color: #3b82f6 !important;
+}
+
+/* ── Divider ── */
+hr {
+    border-color: #bfdbfe !important;
+}
+
+/* ── Spinner ── */
+[data-testid="stSpinner"] p {
+    color: #2563eb !important;
+}
 </style>
-
-<!-- Floating particles -->
-<div style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;">
-    <div style="position:absolute;top:10%;left:5%;width:60px;height:60px;background:rgba(139,92,246,0.2);border-radius:50%;filter:blur(40px);animation:float 8s ease-in-out infinite;"></div>
-    <div style="position:absolute;bottom:20%;right:10%;width:100px;height:100px;background:rgba(59,130,246,0.15);border-radius:50%;filter:blur(50px);animation:float 12s ease-in-out infinite reverse;"></div>
-    <div style="position:absolute;top:50%;left:80%;width:40px;height:40px;background:rgba(236,72,153,0.15);border-radius:50%;filter:blur(30px);animation:float 6s ease-in-out infinite;"></div>
-</div>
 """, unsafe_allow_html=True)
+
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     st.set_page_config(
-        page_title="PersonaTalk 3D",
-        page_icon="✨",
+        page_title="PersonaTalk",
+        page_icon="🐼",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -573,85 +689,192 @@ def main():
         'emotion':    1, 'confidence': 0.5, 'mbti': None, 'mbti_texts': [],
         'mode':       'curhat', 'q_idx': -1, 'q_resp': [],
         'last_bot':   [], 'emo_counts': {i:0 for i in range(6)},
-        '_provider':  None, '_ai_err': None,
+        '_provider':  None, '_ai_err': None, 'chat_open': True,
     }.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
     emo_id = st.session_state.emotion
 
-    # ── Sidebar (glass) ──────────────────────────────────────────────────────
+    # ── Sidebar ──────────────────────────────────────────────────────────────
     with st.sidebar:
-        st.markdown('<div style="text-align:center;padding:20px 0 10px;">✨<div style="font-size:24px;font-weight:700;">PersonaTalk</div><div style="font-size:11px;opacity:0.7;">3D Interactive</div></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:center;padding:20px 0 10px;">'
+            '<div style="font-size:52px;margin-bottom:6px;">🐼</div>'
+            '<div style="font-weight:800;font-size:20px;color:#1d4ed8;">PersonaTalk</div>'
+            '<div style="font-size:12px;color:#2563eb;font-weight:500;margin-top:4px;">AI Mental Wellness Companion</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown("---")
-        
-        # Mood
-        st.markdown("### 🎭 Current Mood")
-        emo_label = EMO_LABEL.get(emo_id, 'Netral')
-        emo_emoji = EMO_EMOJI.get(emo_id, '😊')
-        st.markdown(f'<div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:12px;text-align:center;"><span style="font-size:32px;">{emo_emoji}</span><div style="font-weight:600;">{emo_label}</div><div style="font-size:10px;opacity:0.6;">{int(st.session_state.confidence*100)}% confidence</div></div>', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### 📊 Mood Distribution")
+
+        st.markdown("### 📊 Mood Analytics")
         st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
-        
+
         st.markdown("---")
         if st.session_state.mbti:
-            st.markdown(f"### 🧬 MBTI\n`{st.session_state.mbti}`")
-        
-        status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
-        st.caption(f"AI: {status}")
-        
-        if st.button("🔄 Reset", use_container_width=True):
-            for k in list(st.session_state.keys()):
-                del st.session_state[k]
-            st.rerun()
+            name, _ = MBTI_DESC.get(st.session_state.mbti, ("",""))
+            st.markdown(
+                f'<div style="background:white;border:1.5px solid #bfdbfe;border-radius:10px;padding:10px 14px;">'
+                f'<div style="font-size:11px;color:#2563eb;font-weight:700;margin-bottom:4px;">🧬 MBTI TYPE</div>'
+                f'<div style="font-size:22px;font-weight:800;color:#1d4ed8;">{st.session_state.mbti}</div>'
+                f'<div style="font-size:11px;color:#3b82f6;">{name}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:white;border:1.5px solid #bfdbfe;border-radius:10px;padding:10px 14px;">'
+                '<div style="font-size:11px;color:#2563eb;font-weight:700;margin-bottom:4px;">🧬 MBTI TYPE</div>'
+                '<div style="font-size:13px;color:#60a5fa;">Analyzing dari chat kamu...</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+        provider = st.session_state.get('_provider')
+        status_color = "#16a34a" if provider else "#3b82f6"
+        status_text  = f"🟢 {provider.capitalize()}" if provider else "⚪ Ready"
+        st.markdown(
+            f'<div style="font-size:12px;color:{status_color};font-weight:600;">AI Status: {status_text}</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Main Content ─────────────────────────────────────────────────────────
-    # Hero title
-    st.markdown('<div class="glow-text">✨ PersonaTalk ✨</div>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center;color:#cbd5e1;margin-bottom:24px;">Your AI friend with a soul 💙</p>', unsafe_allow_html=True)
-    
-    # Glass chat container
-    st.markdown('<div class="glass-chat">', unsafe_allow_html=True)
-    
-    # Display chat messages
-    for msg in st.session_state.messages:
+    col1, col2 = st.columns([2, 1], gap="large")
+
+    with col1:
+        # Hero
+        st.markdown('<div class="hero-title">Hi, I\'m PersonaTalk 🐼</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-subtitle">Your AI friend who listens without judgment. 💙</div>', unsafe_allow_html=True)
+
+        # About
+        st.markdown("### About Me")
+        st.markdown(
+            '<div class="about-text">'
+            'PersonaTalk adalah teman curhat AI yang genuine — bukan terapis, bukan bot kaku, '
+            'tapi teman yang selalu siap dengerin. Apapun yang kamu rasain, senang, sedih, '
+            'bingung, atau cuma butuh teman ngobrol, aku di sini.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Feature cards
+        st.markdown("### What I Can Do")
+        c1, c2, c3 = st.columns(3)
+        features = [
+            (c1, "🧠", "Emotion Detection", "Mendeteksi emosi dari teks kamu secara real-time"),
+            (c2, "📊", "MBTI Analysis",     "Menganalisis tipe kepribadian dari cara kamu ngobrol"),
+            (c3, "💬", "Natural Chat",      "Ngobrol santai kayak sama teman beneran"),
+        ]
+        for col, icon, title, desc in features:
+            with col:
+                st.markdown(
+                    f'<div class="skill-card">'
+                    f'<div class="icon">{icon}</div>'
+                    f'<div class="title">{title}</div>'
+                    f'<div class="desc">{desc}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Current mood
+        st.markdown("### Current Mood")
+        emo_label = EMO_LABEL.get(emo_id, 'Netral')
+        emo_emoji = EMO_EMOJI.get(emo_id, '😊')
+        conf_pct  = int(st.session_state.confidence * 100)
+        st.markdown(
+            f'<div style="background:#dbeafe;border:1.5px solid #93c5fd;border-radius:12px;'
+            f'padding:12px 16px;display:flex;align-items:center;gap:12px;">'
+            f'<span style="font-size:28px;">{emo_emoji}</span>'
+            f'<div>'
+            f'<div style="font-weight:700;font-size:1rem;color:#1d4ed8;">{emo_label} Detected</div>'
+            f'<div style="font-size:0.82rem;color:#2563eb;">Confidence: {conf_pct}%</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    with col2:
+        st.markdown("### Quick Stats")
+        total_user = len([m for m in st.session_state.messages if m['role'] == 'user'])
+        mbti_val   = st.session_state.mbti if st.session_state.mbti else "Analyzing..."
+        prov_val   = st.session_state['_provider'].capitalize() if st.session_state['_provider'] else "Ready"
+
+        for label, value in [("💬 Total Chats", total_user), ("🧬 MBTI Status", mbti_val), ("⚡ AI Provider", prov_val)]:
+            st.markdown(
+                f'<div class="stat-card">'
+                f'<div class="stat-label">{label}</div>'
+                f'<div class="stat-value">{value}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # Divider
+    st.markdown("---")
+
+    # Recent Chat Preview
+    st.markdown("### 💬 Recent Chat")
+    last_msgs = st.session_state.messages[-4:]
+    for msg in last_msgs[-3:]:
+        preview = msg["content"][:120] + ("..." if len(msg["content"]) > 120 else "")
         if msg['role'] == 'user':
-            with st.chat_message("user", avatar="👤"):
-                st.write(msg['content'])
+            st.markdown(
+                f'<div class="preview-bubble-user">'
+                f'<div class="bubble-label">👤 Kamu</div>'
+                f'{preview}</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
-                st.write(msg['content'])
-    
-    # Chat input
-    user_text = st.chat_input("Ketik pesan...")
-    
-    if user_text and user_text.strip():
-        user_text = user_text.strip()
-        st.session_state.messages.append({'role': 'user', 'content': user_text})
-        
-        # Process emotion
-        emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
-        st.session_state.emotion = emo_id
-        st.session_state.confidence = conf
-        st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
-        
-        # MBTI
-        mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
-        if mbti_p and mbti_c > 0.3:
-            st.session_state.mbti = mbti_p
-        
-        # Get response
-        response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
-        if not response:
-            response = fallback_response(user_text, emo_id, st.session_state.messages)
-        
-        st.session_state.last_bot.append(response)
-        st.session_state.messages.append({'role': 'bot', 'content': response})
+            st.markdown(
+                f'<div class="preview-bubble-bot">'
+                f'<div class="bubble-label">🐼 PersonaTalk</div>'
+                f'{preview}</div>',
+                unsafe_allow_html=True,
+            )
+
+    # Toggle button
+    btn_label = "✕ Tutup Chat" if st.session_state.chat_open else "💬 Buka Full Chat"
+    if st.button(btn_label, use_container_width=True):
+        st.session_state.chat_open = not st.session_state.chat_open
         st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Full Chat ─────────────────────────────────────────────────────────────
+    if st.session_state.chat_open:
+        st.markdown("---")
+        st.markdown("### 💬 Chat with PersonaTalk")
+
+        for msg in st.session_state.messages:
+            if msg['role'] == 'user':
+                with st.chat_message("user", avatar="👤"):
+                    st.write(msg['content'])
+            else:
+                with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
+                    st.write(msg['content'])
+
+        user_text = st.chat_input("Ketik pesan kamu di sini...")
+
+        if user_text and user_text.strip():
+            user_text = user_text.strip()
+            st.session_state.messages.append({'role': 'user', 'content': user_text})
+
+            emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
+            st.session_state.emotion    = emo_id
+            st.session_state.confidence = conf
+            st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
+
+            mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
+            if mbti_p and mbti_c > 0.3:
+                st.session_state.mbti = mbti_p
+
+            response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
+            if not response:
+                response = fallback_response(user_text, emo_id, st.session_state.messages)
+
+            st.session_state.last_bot.append(response)
+            st.session_state.messages.append({'role': 'bot', 'content': response})
+            st.rerun()
+
 
 if __name__ == "__main__":
     main()
