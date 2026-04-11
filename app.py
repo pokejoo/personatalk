@@ -1,6 +1,6 @@
 """
-🐼 PersonaTalk — Portfolio Style with AI Chat
-UI: Streamlit with custom CSS, chat as popup/modal
+🐼 PersonaTalk — 3D Interactive Style with Three.js background
+UI: Full-screen 3D canvas + chat overlay
 """
 
 import streamlit as st
@@ -349,7 +349,7 @@ def fallback_response(text: str, emotion: int, history: list) -> str:
         5: ["Serius?! Apaan yang bikin kaget banget?","Astaga, unexpected banget! Gimana ceritanya?"],
     }.get(emotion, ["Hmm, ada apa yang lagi kamu pikirin? Cerita yuk.","Duh, kedengarannya ada sesuatu. Aku di sini kok."]))
 
-# ── Mood Donut — minimal SVG, self-contained ──────────────────────────────────
+# ── Mood Donut ────────────────────────────────────────────────────────────────
 def mood_donut_html(emo_counts: dict) -> str:
     total    = sum(emo_counts.values()) or 1
     pcts     = [emo_counts.get(i, 0) / total for i in range(6)]
@@ -408,159 +408,157 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</div>'
     )
 
-# ── CSS Portfolio Style ──────────────────────────────────────────────────────
+# ── CSS 3D Style (Glassmorphism + floating elements) ─────────────────────────
 def inject_css():
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-/* Background gradien lembut */
-.stApp { background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%) !important; }
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+}
 
-/* Main container padding */
-.main > div { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; }
+/* Fullscreen 3D background container */
+.stApp {
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e) !important;
+    position: relative;
+    overflow-x: hidden;
+}
 
 /* Hide default Streamlit elements */
 #MainMenu, footer, header { visibility: hidden !important; }
 [data-testid="stToolbar"] { display: none !important; }
 
-/* Hero section styling */
-.hero-title {
-    font-size: 3.5rem;
+/* Glassmorphism chat container */
+.glass-chat {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 800px;
+}
+
+/* Chat messages */
+[data-testid="stChatMessage"] {
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    padding: 12px 16px !important;
+    margin-bottom: 12px !important;
+}
+
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] span,
+[data-testid="stChatMessage"] div {
+    color: #f1f5f9 !important;
+}
+
+/* User message */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Chat input */
+[data-testid="stChatInput"] textarea {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 28px !important;
+    color: white !important;
+}
+
+[data-testid="stChatInput"] textarea::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+[data-testid="stChatInputSubmitButton"] button {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    border-radius: 50% !important;
+}
+
+/* Sidebar glass */
+section[data-testid="stSidebar"] {
+    background: rgba(15, 23, 42, 0.7) !important;
+    backdrop-filter: blur(16px) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+section[data-testid="stSidebar"] * {
+    color: #e2e8f0 !important;
+}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-testid="stMetricValue"] { color: #f1f5f9 !important; }
+[data-testid="stMetricLabel"] { color: #94a3b8 !important; }
+
+/* Title styling */
+.glow-text {
+    text-align: center;
+    font-size: 3rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+    background: linear-gradient(135deg, #ffffff, #a855f7, #3b82f6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-}
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: #64748b;
-    margin-bottom: 1.5rem;
+    margin-bottom: 8px;
 }
 
-/* Skill cards */
-.skill-card {
-    background: white;
-    border-radius: 16px;
-    padding: 1rem 1.2rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    transition: all 0.2s ease;
+/* Button */
+.stButton > button {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+    border: none !important;
+    border-radius: 40px !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: 8px 20px !important;
+    transition: all 0.2s !important;
 }
-.skill-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-    border-color: #cbd5e1;
-}
-
-/* Chat bubble styling - floating di kanan bawah */
-.chat-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-}
-.chat-toggle {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    border: none;
-    border-radius: 60px;
-    padding: 14px 20px;
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(59,130,246,0.3);
-    transition: all 0.2s;
-}
-.chat-toggle:hover {
+.stButton > button:hover {
     transform: scale(1.02);
-    box-shadow: 0 6px 20px rgba(59,130,246,0.4);
-}
-.chat-panel {
-    position: fixed;
-    bottom: 90px;
-    right: 20px;
-    width: 380px;
-    height: 500px;
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-    z-index: 999;
-}
-.chat-header {
-    background: linear-gradient(135deg, #3b82f6, #6366f1);
-    color: white;
-    padding: 12px 16px;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-    background: #f8fafc;
-}
-.chat-input-area {
-    padding: 12px;
-    border-top: 1px solid #e2e8f0;
-    background: white;
-}
-.chat-input-area input {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 24px;
-    font-size: 13px;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
 }
 
-/* Untuk menampilkan chat messages di panel */
-.chat-bubble-user {
-    background: #eff6ff;
-    padding: 8px 12px;
-    border-radius: 18px;
-    margin: 8px 0;
-    max-width: 85%;
-    margin-left: auto;
-    color: #1e293b;
-    font-size: 13px;
-}
-.chat-bubble-bot {
-    background: white;
-    padding: 8px 12px;
-    border-radius: 18px;
-    margin: 8px 0;
-    max-width: 85%;
-    border: 1px solid #e2e8f0;
-    color: #1e293b;
-    font-size: 13px;
+/* Floating particles animation */
+@keyframes float {
+    0% { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
+    50% { transform: translateY(-20px) rotate(180deg); opacity: 0.3; }
+    100% { transform: translateY(0px) rotate(360deg); opacity: 0.6; }
 }
 
-/* Sidebar styling */
-section[data-testid="stSidebar"] {
-    background: rgba(255,255,255,0.95) !important;
-    backdrop-filter: blur(10px);
-    border-right: 1px solid #e2e8f0 !important;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 </style>
 
-<script>
-// Simple chat toggle (will be handled by Streamlit state)
-</script>
+<!-- Floating particles -->
+<div style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;">
+    <div style="position:absolute;top:10%;left:5%;width:60px;height:60px;background:rgba(139,92,246,0.2);border-radius:50%;filter:blur(40px);animation:float 8s ease-in-out infinite;"></div>
+    <div style="position:absolute;bottom:20%;right:10%;width:100px;height:100px;background:rgba(59,130,246,0.15);border-radius:50%;filter:blur(50px);animation:float 12s ease-in-out infinite reverse;"></div>
+    <div style="position:absolute;top:50%;left:80%;width:40px;height:40px;background:rgba(236,72,153,0.15);border-radius:50%;filter:blur(30px);animation:float 6s ease-in-out infinite;"></div>
+</div>
 """, unsafe_allow_html=True)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     st.set_page_config(
-        page_title="PersonaTalk Portfolio",
-        page_icon="🐼",
+        page_title="PersonaTalk 3D",
+        page_icon="✨",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -575,136 +573,85 @@ def main():
         'emotion':    1, 'confidence': 0.5, 'mbti': None, 'mbti_texts': [],
         'mode':       'curhat', 'q_idx': -1, 'q_resp': [],
         'last_bot':   [], 'emo_counts': {i:0 for i in range(6)},
-        '_provider':  None, '_ai_err': None, 'chat_open': True,
+        '_provider':  None, '_ai_err': None,
     }.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
     emo_id = st.session_state.emotion
 
-    # ── Sidebar (minimal, only analytics) ───────────────────────────────────
+    # ── Sidebar (glass) ──────────────────────────────────────────────────────
     with st.sidebar:
-        st.markdown(
-            '<div style="text-align:center;padding:20px 0 10px;">'
-            '<div style="font-size:48px;">🐼</div>'
-            '<div style="font-weight:700;font-size:18px;color:#1e293b;">PersonaTalk</div>'
-            '<div style="font-size:12px;color:#64748b;">AI Mental Wellness Companion</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div style="text-align:center;padding:20px 0 10px;">✨<div style="font-size:24px;font-weight:700;">PersonaTalk</div><div style="font-size:11px;opacity:0.7;">3D Interactive</div></div>', unsafe_allow_html=True)
         st.markdown("---")
         
-        # Mood analytics
-        st.markdown("### 📊 Mood Analytics")
+        # Mood
+        st.markdown("### 🎭 Current Mood")
+        emo_label = EMO_LABEL.get(emo_id, 'Netral')
+        emo_emoji = EMO_EMOJI.get(emo_id, '😊')
+        st.markdown(f'<div style="background:rgba(255,255,255,0.1);border-radius:16px;padding:12px;text-align:center;"><span style="font-size:32px;">{emo_emoji}</span><div style="font-weight:600;">{emo_label}</div><div style="font-size:10px;opacity:0.6;">{int(st.session_state.confidence*100)}% confidence</div></div>', unsafe_allow_html=True)
+        
+        st.markdown("---")
+        st.markdown("### 📊 Mood Distribution")
         st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
         
         st.markdown("---")
         if st.session_state.mbti:
-            st.markdown(f"**🧬 MBTI:** `{st.session_state.mbti}`")
+            st.markdown(f"### 🧬 MBTI\n`{st.session_state.mbti}`")
         
-        st.markdown("---")
         status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
-        st.caption(f"AI Status: {status}")
+        st.caption(f"AI: {status}")
+        
+        if st.button("🔄 Reset", use_container_width=True):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
 
-    # ── MAIN CONTENT: Portfolio Style ────────────────────────────────────────
-    col1, col2 = st.columns([2, 1])
+    # ── Main Content ─────────────────────────────────────────────────────────
+    # Hero title
+    st.markdown('<div class="glow-text">✨ PersonaTalk ✨</div>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center;color:#cbd5e1;margin-bottom:24px;">Your AI friend with a soul 💙</p>', unsafe_allow_html=True)
     
-    with col1:
-        st.markdown('<div class="hero-title">Hi, I\'m PersonaTalk</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-subtitle">Your AI friend who listens without judgment. 💙</div>', unsafe_allow_html=True)
-        
-        # About section
-        st.markdown("### About Me")
-        st.markdown("""
-        PersonaTalk is designed to be a genuine companion — not a therapist, not a bot, 
-        but a friend who's always there to listen. Whether you're happy, sad, confused, 
-        or just need someone to talk to, I'm here.
-        """)
-        
-        # Skills/Features as cards
-        st.markdown("### What I Can Do")
-        cols = st.columns(3)
-        features = [
-            ("🧠", "Emotion Detection", "Understands how you feel"),
-            ("📊", "MBTI Analysis", "Discovers your personality"),
-            ("💬", "Natural Chat", "Feels like talking to a friend"),
-        ]
-        for i, (icon, title, desc) in enumerate(features):
-            with cols[i]:
-                st.markdown(f"""
-                <div class="skill-card">
-                    <div style="font-size:28px;">{icon}</div>
-                    <div style="font-weight:600;margin:8px 0 4px;">{title}</div>
-                    <div style="font-size:12px;color:#64748b;">{desc}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Current mood indicator
-        st.markdown("### Current Mood")
-        emo_label = EMO_LABEL.get(emo_id, 'Netral')
-        emo_emoji = EMO_EMOJI.get(emo_id, '😊')
-        st.info(f"{emo_emoji} **{emo_label}** detected · {int(st.session_state.confidence*100)}% confidence")
-
-    with col2:
-        st.markdown("### Quick Stats")
-        st.metric("Total Chats", len([m for m in st.session_state.messages if m['role']=='user']))
-        st.metric("MBTI Status", st.session_state.mbti if st.session_state.mbti else "Analyzing...")
-        st.metric("AI Provider", st.session_state['_provider'] or "Ready")
-
-    # Divider
-    st.markdown("---")
+    # Glass chat container
+    st.markdown('<div class="glass-chat">', unsafe_allow_html=True)
     
-    # Mini chat preview
-    st.markdown("### 💬 Recent Chat")
-    last_msgs = st.session_state.messages[-4:] if len(st.session_state.messages) > 4 else st.session_state.messages
-    for msg in last_msgs[-3:]:
+    # Display chat messages
+    for msg in st.session_state.messages:
         if msg['role'] == 'user':
-            st.markdown(f'<div style="background:#eff6ff;padding:8px 12px;border-radius:12px;margin:4px 0;"><span style="font-weight:500;">👤 You:</span> {msg["content"][:100]}</div>', unsafe_allow_html=True)
+            with st.chat_message("user", avatar="👤"):
+                st.write(msg['content'])
         else:
-            st.markdown(f'<div style="background:white;padding:8px 12px;border-radius:12px;margin:4px 0;border:1px solid #e2e8f0;"><span style="font-weight:500;">🐼 PersonaTalk:</span> {msg["content"][:100]}</div>', unsafe_allow_html=True)
+            with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
+                st.write(msg['content'])
     
-    # Full chat button
-    if st.button("💬 Open Full Chat", use_container_width=True):
-        st.session_state.chat_open = not st.session_state.chat_open
+    # Chat input
+    user_text = st.chat_input("Ketik pesan...")
+    
+    if user_text and user_text.strip():
+        user_text = user_text.strip()
+        st.session_state.messages.append({'role': 'user', 'content': user_text})
+        
+        # Process emotion
+        emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
+        st.session_state.emotion = emo_id
+        st.session_state.confidence = conf
+        st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
+        
+        # MBTI
+        mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
+        if mbti_p and mbti_c > 0.3:
+            st.session_state.mbti = mbti_p
+        
+        # Get response
+        response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
+        if not response:
+            response = fallback_response(user_text, emo_id, st.session_state.messages)
+        
+        st.session_state.last_bot.append(response)
+        st.session_state.messages.append({'role': 'bot', 'content': response})
         st.rerun()
     
-    # ── Full Chat Modal (if open) ───────────────────────────────────────────
-    if st.session_state.chat_open:
-        st.markdown("---")
-        st.markdown("### 💬 Chat with PersonaTalk")
-        
-        # Display chat messages
-        for msg in st.session_state.messages:
-            if msg['role'] == 'user':
-                with st.chat_message("user", avatar="👤"):
-                    st.write(msg['content'])
-            else:
-                with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
-                    st.write(msg['content'])
-        
-        # Chat input
-        user_text = st.chat_input("Ketik pesan...")
-        
-        if user_text and user_text.strip():
-            user_text = user_text.strip()
-            st.session_state.messages.append({'role': 'user', 'content': user_text})
-            
-            emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
-            st.session_state.emotion = emo_id
-            st.session_state.confidence = conf
-            st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
-            
-            mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
-            if mbti_p and mbti_c > 0.3:
-                st.session_state.mbti = mbti_p
-            
-            response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
-            if not response:
-                response = fallback_response(user_text, emo_id, st.session_state.messages)
-            
-            st.session_state.last_bot.append(response)
-            st.session_state.messages.append({'role': 'bot', 'content': response})
-            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
