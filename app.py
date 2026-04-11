@@ -260,40 +260,69 @@ KARAKTER & KEPRIBADIAN:
 CARA NGOBROL:
 ✓ Bahasa Indonesia sehari-hari, santai, boleh code-mixing indo-english
 ✓ Mulai dengan VALIDASI perasaan yang SPESIFIK, bukan template generic
-✓ Gunakan ekspresi natural: "duh", "hmm", "ya Allah", "aduh", "serius?", "oof"
+✓ Gunakan ekspresi natural & VARIED: "duh", "hmm", "ya Allah", "aduh", "serius?", "oof", "wah", "ooh"
 ✓ Panjang: 2-4 kalimat maksimal, short and snappy
 ✓ Akhiri dengan 1 pertanyaan terbuka yang RELEVAN dan PERSONAL
 ✓ Jangan pakai format bullet point atau struktur kaku
 ✓ Jangan sebut diri sebagai AI, bot, atau assistant
-✓ Jangan ulangi pola kalimat yang sama di response sebelumnya
+✓ JANGAN ulangi pola kalimat SAMA, terutama question patterns ("Cerita dong lebih", "ini kenapa?", "udah berapa lama")
+✓ SETIAP RESPONSE HARUS UNIK dari 3 response sebelumnya
+✓ Vary the structure: sometimes validate first, sometimes ask first, sometimes make observation
 
-PANDUAN PER EMOSI:
-[SEDIH/GALAU] → "Peluk virtual dulu, baru tanya" — acknowledge kehilangannya, tanya about timeline
-  Contoh: "Duh, 2 tahun tuh banyak banget waktu sama seseorang... pasti sekarang rasanya kosong banget ya? Kamu udah cerita ke siapa aja?"
+RESPONSE VARIETY RULES (CRITICAL):
+→ Kalau response terakhir mulai dengan "Wah", jangan mulai dengan "Wah" lagi — gunakan "Ooh", "Duh", "Ya ampun", dsb
+→ Kalau terakhir diakhiri "Cerita dong lebih", gunakan follow-up BERBEDA: "Gimana menurutmu?", "Itu berat banget ya?", "Jabarkan dong"
+→ Kalau terakhir adalah 3 kalimat, ini bisa jadi 2 atau 4 kalimat (variasi length)
+→ Kalau terakhir banyak emotions, next response fokus ke action/insight
+→ TRACK 3 RESPONSE TERAKHIR — jangan repeat structure atau opening
+
+PANDUAN PER EMOSI (dengan MULTIPLE APPROACHES):
+
+[SENANG/EXCITED] — WAJIB VARY:
+  Approach 1: "Wah, ada yang bagus nih! Cerita dong — detail-nya gimana?"
+  Approach 2: "Ooh, menarik! Ini senang karena apa sih?"
+  Approach 3: "Ya ampun, ini ada yang bikin kamu happy! Jabarkan dong, excited nih 😄"
+  Approach 4: "Duh, kedengarannya asik! Apa sih yang bikin semangat?"
+  Approach 5: "Wah, ada yang bagus ya! Cerita dari awal gimana ceritanya?"
+  → Pick yang BELUM dipake di 3 response terakhir
   
-[MARAH] → Acknowledge kemarahannya sebagai valid, jangan bilang "calm down"
-  Contoh: "Oof, tuh jelas bikin kesel. Kemarahan itu valid sih — ada apa sih yang paling bikin kamu naik darah?"
+[SEDIH/GALAU] — WAJIB VARY:
+  Approach 1: "Duh, kedengarannya berat banget ya. Kamu udah berapa lama ngerasa gini?"
+  Approach 2: "Aduh, ini gimana awalnya? Cerita yuk."
+  Approach 3: "Ya Allah, itu berat. Sekarang kamu gimana — sendirian atau ada support?"
+  Approach 4: "Ouch, kedengarannya nyakitin. Ini baru terjadi atau udah lama nahan?"
+  Approach 5: "Hmm, sedih kayak gini emang susah. Ada yang bisa support kamu nggak?"
+  → NEVER repeat same opening dalam conversation
   
-[BINGUNG/OVERWHELM] → Temenin dulu, jangan langsung kasih solusi
-  Contoh: "Hmm, kedengarannya overwhelming banget ya. Kamu ngerasa bingung soal apa yang paling — feeling atau fakta?"
-  
-[SENANG/EXCITED] → Ikut excited! Energy match mereka
-  Contoh: "Wah, ada yang bagus nih kayaknya! Cerita dong — udah berapa lama kenal?"
-  
-[CINTA/NAKSIR] → Supportive tapi juga realistic, gak naïf
-  Contoh: "Ooh, menarik! Gimana perasaan kamu — ini crush biasa atau beneran jatuh cinta nih?"
-  
-[CEMAS/ANXIETY] → Validate kecemasannya, tanya apakah ini overthinking atau ada alasan real
-  Contoh: "Ngerti banget, kekhawatiran itu nyesek. Tapi ini kamu cemas soal hal yang udah terjadi atau yang belum?"
+[MARAH] — WAJIB VARY:
+  Approach 1: "Oof, kemarahan itu valid sih. Apaan sih yang paling bikin kesel?"
+  Approach 2: "Ya Allah, siapa sih yang udah bikin kamu sendle kayak gini?"
+  Approach 3: "Duh, emosi banget. Dari tadi pagi atau something build-up?"
+  Approach 4: "Serius? Itu emang bajunya. Cerita dong — dari detik pertama apa?"
+  Approach 5: "Ouch, marah yang kayak gini bikin capek. Udah berapa lama?"
+
+[CEMAS] — WAJIB VARY:
+  Approach 1: "Ngerti, kekhawatiran itu nyesek. Ini overthinking atau ada alasan real?"
+  Approach 2: "Gelisah kayak gini nggak enak banget. Udah berapa lama?"
+  Approach 3: "Hmm, kecemasannya soal apa sih — orang, situasi, atau diri sendiri?"
+  Approach 4: "Panik gini emang susah dimatiin. Apa yang paling bikin was-was?"
+  Approach 5: "Cemas banget nih. Ini pikiran aja atau ada yang bikin khawatir?"
+
+[CINTA/CRUSH] — WAJIB VARY:
+  Approach 1: "Ooh, menarik! Dia tau nggak kamu naksir?"
+  Approach 2: "Wah, ada yang spesial! Udah kenal berapa lama?"
+  Approach 3: "Duh, ada crush nih! Gimana menurutmu dia tertarik ke kamu nggak?"
+  Approach 4: "Ooh, siapa nih orang yang bikin kamu gini? Jabarkan dong 😄"
+  Approach 5: "Ada yang spesial ya! Dia teman atau orang baru?"
 
 PENTING — JANGAN:
 ✗ Diagnosis medis/psikologis ("kamu mungkin depresi")
 ✗ Saran berbahaya atau minimisasi perasaan
-✗ Pembuka yang sama terus-menerus ("Perasaan seperti ini sangat manusiawi kok")
+✗ ULANGI pembuka atau closing yang sama 2x dalam 5 messages terakhir
 ✗ Template corporate ("Saya mengerti apa yang Anda rasakan")
 ✗ Long paragraphs — 2-4 kalimat aja
-✗ Repeat previous response patterns
-✗ Assume context jika user ngasih respons pendek — tanya klarifikasi instead
+✗ Same question pattern: "Cerita dong lebih" tidak boleh di 3 pesan terakhir
+✗ Robotic/copy-paste vibes at any cost
 
 ADVANCED — BACA KONTEKS:
 • Kalau user cerita ambiguous, pick up dari conversation history — apa topik sebelumnya?
@@ -335,20 +364,126 @@ Message count: {len(messages)}
 
 === TASK ===
 Respond to the user's last message in a natural, empathetic way. 
-Keep it to 2-4 sentences max. End with ONE genuine follow-up question."""
+Keep it to 2-4 sentences max. End with ONE genuine follow-up question.
+CRITICAL: Make sure response is DIFFERENT from any previous messages in this conversation."""
 
-def generate_ai_response(user_text: str, emotion_label: str, history: list) -> str:
+def extract_response_signature(text: str) -> dict:
+    """
+    Extract response signature untuk detect duplicates:
+    - First 2 words (opening)
+    - Last 5 words (closing)
+    - Number of sentences
+    - Question patterns
+    """
+    if not text:
+        return {}
+    
+    text_clean = text.strip()
+    words = text_clean.split()
+    sentences = [s.strip() for s in text_clean.split('.') if s.strip()]
+    
+    opening = ' '.join(words[:2]).lower() if len(words) >= 2 else text_clean[:20].lower()
+    closing = ' '.join(words[-5:]).lower() if len(words) >= 5 else text_clean[-20:].lower()
+    
+    # Detect question patterns
+    has_cerita_pattern = "cerita" in text_clean.lower()
+    has_how_pattern = any(w in text_clean.lower() for w in ["gimana", "bagaimana", "apa", "siapa"])
+    
+    return {
+        'opening': opening,
+        'closing': closing,
+        'sentence_count': len(sentences),
+        'has_cerita': has_cerita_pattern,
+        'has_how': has_how_pattern,
+        'text': text_clean,
+    }
+
+def is_duplicate_response(new_response: str, last_bot_responses: list, threshold: float = 0.65) -> bool:
+    """
+    Check if new response is too similar to recent responses.
+    Returns True jika terlalu similar (duplicate).
+    """
+    if not last_bot_responses or not new_response:
+        return False
+    
+    new_sig = extract_response_signature(new_response)
+    if not new_sig:
+        return False
+    
+    # Check last 3 responses
+    for old_response in last_bot_responses[-3:]:
+        old_sig = extract_response_signature(old_response)
+        if not old_sig:
+            continue
+        
+        # Score similarity
+        score = 0
+        max_score = 0
+        
+        # Opening similarity (high weight)
+        max_score += 2
+        if new_sig['opening'] == old_sig['opening']:
+            score += 2
+        elif any(w in new_sig['opening'] for w in old_sig['opening'].split()):
+            score += 1
+        
+        # Closing similarity (medium weight)
+        max_score += 1.5
+        if new_sig['closing'] == old_sig['closing']:
+            score += 1.5
+        
+        # Sentence count similarity
+        max_score += 1
+        if new_sig['sentence_count'] == old_sig['sentence_count']:
+            score += 0.5
+        
+        # Question pattern similarity
+        max_score += 1
+        if new_sig['has_cerita'] and old_sig['has_cerita']:
+            score += 1
+        if new_sig['has_how'] and old_sig['has_how']:
+            score += 0.5
+        
+        # Semantic similarity (check if text is too similar)
+        max_score += 2
+        new_words = set(new_response.lower().split())
+        old_words = set(old_response.lower().split())
+        if len(new_words & old_words) / max(len(new_words | old_words), 1) > 0.7:
+            score += 2
+        
+        # Normalize score
+        similarity = score / max_score if max_score > 0 else 0
+        if similarity > threshold:
+            return True
+    
+    return False
+
+def generate_ai_response(user_text: str, emotion_label: str, history: list, last_bot_responses: list = None) -> str:
     """
     Generate response using Gemini (primary) atau Claude (fallback).
-    Optimized untuk natural, contextual responses.
+    Optimized untuk natural, contextual responses dengan duplicate prevention.
     """
     context = build_conversation_context(history, emotion_label)
     
-    user_prompt = f"""{context}
+    # Include recent responses untuk prevent duplicates
+    recent_responses_text = ""
+    if last_bot_responses:
+        recent = last_bot_responses[-2:]  # Last 2 responses
+        recent_responses_text = "\n\nRECENT PREVIOUS RESPONSES (do NOT repeat these patterns):\n"
+        for i, resp in enumerate(recent, 1):
+            recent_responses_text += f"{i}. {resp}\n"
+    
+    user_prompt = f"""{context}{recent_responses_text}
 
 User's last message: "{user_text}"
 
 Respond as PersonaTalk — warm, natural, specific to their situation. 
+CRITICAL RULES:
+• 2-4 sentences max, no more
+• Do NOT repeat opening phrases from recent responses
+• Do NOT use same question pattern twice (no "cerita dong lebih" if used recently)
+• Vary your expression: use different opening words (duh, wah, ooh, ya Allah, aduh, duh, etc)
+• Be genuinely curious, not robotic
 No templates, no corporate speak, just genuine friend energy."""
 
     # === GEMINI (primary — lebih cepat) ===
@@ -358,10 +493,10 @@ No templates, no corporate speak, just genuine friend energy."""
             response = model.generate_content(
                 content=f"{SYSTEM_PROMPT}\n\n{user_prompt}",
                 generation_config=genai.types.GenerationConfig(
-                    temperature=0.9,  # Higher untuk creativity, tapi controlled
-                    top_p=0.95,
+                    temperature=0.95,  # Slightly higher untuk lebih varied
+                    top_p=0.98,
                     max_output_tokens=250,
-                    top_k=40,
+                    top_k=50,
                 ),
                 safety_settings=[
                     {
@@ -389,7 +524,10 @@ No templates, no corporate speak, just genuine friend energy."""
             result = result.strip()
             
             if result and len(result) > 10:
-                return result
+                # Check for duplicates
+                if not is_duplicate_response(result, last_bot_responses or []):
+                    return result
+                # If duplicate, let fallback handle it
         except Exception as e:
             st.session_state['_last_ai_error'] = f"Gemini error: {str(e)[:80]}"
 
@@ -400,15 +538,16 @@ No templates, no corporate speak, just genuine friend energy."""
             msg = client.messages.create(
                 model="claude-opus-4-1",
                 max_tokens=250,
-                temperature=0.9,
+                temperature=0.95,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}]
             )
             result = msg.content[0].text.strip()
             result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)
             if result:
-                st.session_state['_last_ai_error'] = None
-                return result
+                if not is_duplicate_response(result, last_bot_responses or []):
+                    st.session_state['_last_ai_error'] = None
+                    return result
         except Exception as e:
             prev_err = st.session_state.get('_last_ai_error', '')
             st.session_state['_last_ai_error'] = (prev_err + " | " if prev_err else "") + f"Claude: {str(e)[:80]}"
@@ -417,7 +556,7 @@ No templates, no corporate speak, just genuine friend energy."""
 
 def smart_fallback_response(text: str, emotion: int, history: list = None) -> str:
     """
-    Smart fallback yang context-aware dan lebih natural.
+    Smart fallback yang context-aware dengan MULTIPLE VARIATIONS per pattern.
     Digunakan kalau API gagal atau tidak tersedia.
     """
     t = text.lower().strip()
@@ -429,70 +568,155 @@ def smart_fallback_response(text: str, emotion: int, history: list = None) -> st
         full_context = ' '.join(user_msgs)
     
     fc = full_context
+    last_responses = history[-2:] if history else [] if isinstance(history, list) else []
     
-    # === PATTERN-BASED SMART RESPONSES ===
+    # === PATTERN-BASED SMART RESPONSES WITH VARIATIONS ===
     
     # Relationship breakup / putus
     if any(w in fc for w in ['putus','selingkuh','ditinggal','diputus','diselingkuhin','dikhianatin']):
         if '2 tahun' in fc or 'bertahun' in fc:
-            return "Duh, 2 tahun tuh banyak banget waktu sama seseorang... pasti sekarang rasanya campur aduk banget ya? Kamu masih sering kepikiran dia?"
+            opts = [
+                "Duh, 2 tahun tuh banyak banget waktu sama seseorang... pasti sekarang rasanya campur aduk banget ya? Kamu masih sering kepikiran dia?",
+                "Ya ampun, setahun tuh invest waktu yang banyak banget. Kamu lagi sendirian atau ada yang support kamu sekarang?",
+                "2 tahun itu beneran waktu yang lama. Sekarang gimana — masih sering kepikiran atau udah mulai move on dikit?",
+            ]
         elif 'selingkuh' in fc:
-            return "Ya Allah, diselingkuhin setelah sekian lama itu sadis banget. Kamu tau dari mana sampai ketahuan?"
+            opts = [
+                "Ya Allah, diselingkuhin itu sadis banget. Kamu tau dari mana sampai ketahuan?",
+                "Ouch, diselingkuhin setelah sekian lama itu menyakitin banget. Dia still deny atau udah jelas?",
+                "Duh, selingkuh itu emang bikin marah dan sedih bersamaan. Ini baru ketahuan atau udah lama nahan?",
+            ]
         else:
-            return "Aduh, putus tuh emang nyakitin. Sekarang kamu gimana — sendirian atau ada yang support?"
+            opts = [
+                "Aduh, putus tuh emang nyakitin. Sekarang kamu gimana — sendirian atau ada yang support?",
+                "Ya Allah, breakup itu berat banget. Kamu udah cerita ke orang terdekat?",
+                "Ouch, putus tuh emang berasa kosong. Ini baru terjadi atau udah beberapa hari lalu?",
+            ]
+        return random.choice(opts)
     
     # Confusion / bingung
     if any(w in fc for w in ['bingung','harus apa','mau ngapain','ga tahu','nggak tahu','blank']):
         if any(w in fc for w in ['dia','orang','teman']):
-            return "Hmm, ngerasa bingung sama situasi orang lain itu emang susah. Cerita lebih detail — dia yang perlu bantuan atau kamu yang bingung gimana bantu dia?"
+            opts = [
+                "Hmm, ngerasa bingung sama situasi orang lain itu emang susah. Dia yang butuh bantuan atau kamu yang bingung gimana caranya?",
+                "Ooh, bingung dengan orang lain tuh menyebalkan. Dia tahu nggak kalau kamu concerned?",
+            ]
         else:
-            return "Ngerasa blank kayak gini berat ya... ini bingung soal hidup sehari-hari atau soal keputusan besar?"
+            opts = [
+                "Ngerasa blank kayak gini berat ya... ini bingung soal hidup sehari-hari atau soal keputusan besar?",
+                "Hmm, blank kayak gini emang overwhelming. Kepala kamu penuh mikir apa nih?",
+                "Blank banget nih. Kamu butuh bantuan atau cuma perlu ventilate dulu?",
+            ]
+        return random.choice(opts)
     
     # Longing / rindu / kangen
     if any(w in fc for w in ['rindu','kangen','ketinggalan','missing','long for','udah berapa lama']):
         if 'dia' in fc or 'dia' in t:
-            return "Ooh, kangen yang kayak gini berat. Dia masih reply chat kamu nggak? Atau udah jauh-jauh?"
+            opts = [
+                "Ooh, kangen yang kayak gini berat. Dia masih reply chat kamu nggak? Atau udah jauh-jauh?",
+                "Rindu yang dalam kayak gini biasanya berasa lemas. Udah berapa lama nggak ketemu?",
+                "Duh, kangen orang tuh emang nyesek. Dia tahu nggak kalau kamu kangen?",
+            ]
         else:
-            return "Rindu kayak gini biasanya signal ada yang kita miss. Kamu rindu sama orang atau sama situasi dulu?"
+            opts = [
+                "Rindu kayak gini biasanya signal ada yang kita miss. Kamu rindu sama orang atau sama situasi dulu?",
+                "Kangen kayak gini ada apa sih yang bikin kamu teringat?",
+            ]
+        return random.choice(opts)
     
     # Happy / excited
     if emotion == 1 or any(w in fc for w in ['happy','senang','excited','yay','wohoo','bagus banget']):
-        return "Wah, ada yang bagus nih! Cerita dong lebih — ini senang karena apa?"
+        opts = [
+            "Wah, ada yang bagus nih! Cerita dong lebih — ini senang karena apa?",
+            "Ooh, menarik! Apa yang bikin kamu happy kayak gini?",
+            "Duh, kedengarannya ada yang asik! Jabarkan dong, excited nih 😄",
+            "Ya ampun, ada yang bagus! Gimana awalnya?",
+            "Wah, ada yang bikin kamu senang! Apaan sih ceritanya?",
+        ]
+        return random.choice(opts)
     
     # Anger
     if emotion == 3 or any(w in fc for w in ['marah','kesal','benci','emosi','ngebully','ngehina']):
         if 'dibohongin' in fc or 'ditipu' in fc:
-            return "Oof, dibohongin tuh bikin marah dan kecewa bersamaan. Udah lama dia gini atau baru ketahuan?"
+            opts = [
+                "Oof, dibohongin tuh bikin marah dan kecewa bersamaan. Udah lama dia gini atau baru ketahuan?",
+                "Duh, ditipu itu sadis. Siapa sih yang udah bohong?",
+            ]
         else:
-            return "Iya, kemarahan itu valid sih. Tapi ini marah sama orang atau situasinya yang bikin frustasi?"
+            opts = [
+                "Iya, kemarahan itu valid sih. Tapi ini marah sama orang atau situasinya yang bikin frustasi?",
+                "Marah kayak gini emang bikin panas. Apaan sih yang paling bikin kesel?",
+                "Duh, emosi banget nih. Udah berapa lama atau sudden banget?",
+            ]
+        return random.choice(opts)
     
     # Anxiety / cemas
     if emotion == 4 or any(w in fc for w in ['cemas','khawatir','panik','gelisah','overthinking','was-was','deg degan']):
-        return "Ngerti banget, kekhawatiran tuh nyesek. Ini kamu cemas soal hal yang udah terjadi atau yang belum — overthinking gitu?"
+        opts = [
+            "Ngerti banget, kekhawatiran tuh nyesek. Ini kamu cemas soal hal yang udah terjadi atau yang belum — overthinking gitu?",
+            "Gelisah kayak gini nggak enak. Udah berapa lama ngerasa gini?",
+            "Cemas yang kayak gini emang bikin tidur jadi susah. Ada yang bikin kamu khawatir spesifik?",
+            "Hmm, kecemasannya soal apa sih yang paling — orang, situasi, atau diri sendiri?",
+        ]
+        return random.choice(opts)
     
     # Surprise / shock
     if emotion == 5 or any(w in fc for w in ['kaget','shock','astaga','nggak nyangka','unexpected']):
-        return "Serius? Itu shocking banget! Cerita dong — apaan yang bikin kamu kaget gini?"
+        opts = [
+            "Serius? Itu shocking banget! Cerita dong — apaan yang bikin kamu kaget gini?",
+            "Astaga, ngejamain nih! Apaan yang ngejamain?",
+            "Nggak nyangka ya biasanya paling shock. Gimana ceritanya?",
+        ]
+        return random.choice(opts)
     
     # Crush / naksir
     if any(w in fc for w in ['suka','naksir','gebetan','pdkt','cantik','ganteng','jatuh cinta','crush']):
         if 'cerita' in fc or 'bilang' in fc:
-            return "Ooh, menarik! Dia tau nggak kalau kamu naksir? Atau masih tahap investigate?"
+            opts = [
+                "Ooh, menarik! Dia tau nggak kalau kamu naksir? Atau masih tahap investigate?",
+                "Wah, ada yang spesial nih! Sudah cerita ke siapa aja?",
+            ]
         else:
-            return "Wah, ada yang spesial nih kayaknya! Lama kenal atau baru kenal?"
+            opts = [
+                "Wah, ada yang spesial nih kayaknya! Lama kenal atau baru kenal?",
+                "Ooh, siapa nih orang yang bikin kamu gini? Cerita dong!",
+                "Ada yang menarik perhatian nih! Gimana dia?",
+            ]
+        return random.choice(opts)
     
     # Exhaustion / capek
     if any(w in fc for w in ['capek','lelah','exhausted','burnout','tired','tepar','ngos-ngosan']):
-        return "Capek yang kayak gini beda ya, bukan cuman fisik doang. Ini capek dari school/work atau personal life?"
+        opts = [
+            "Capek yang kayak gini beda ya, bukan cuman fisik doang. Ini capek dari school/work atau personal life?",
+            "Lelah banget nih. Udah coba istirahat atau ini kayak emotional exhaustion?",
+            "Capek yang dalam kayak gini emang bikin mood jelek. Ada yang bisa help atau kamu perlu solo time?",
+        ]
+        return random.choice(opts)
     
     # Default based on emotion
     if emotion == 0:
-        return "Duh, kedengarannya berat banget. Mau cerita lebih detail? Aku dengerin kok."
+        opts = [
+            "Duh, kedengarannya berat banget. Mau cerita lebih detail? Aku dengerin kok.",
+            "Aduh, ada yang lagi dipikirin nih. Cerita yuk, aku siap mendengar.",
+            "Ya Allah, kedengarannya tough. Kamu gimana nih?",
+        ]
+        return random.choice(opts)
     elif emotion == 2:
-        return "Ooh, ada yang berwarna ya! Cerita dong siapa dia."
+        opts = [
+            "Ooh, ada yang berwarna ya! Cerita dong siapa dia.",
+            "Duh, ada yang bikin kamu gini! Gimana dia?",
+            "Wah, ada orang special nih kayaknya! Jabarkan dong 😊",
+        ]
+        return random.choice(opts)
     
-    # Ultimate fallback
-    return "Hmm, cerita lebih yuk. Ada apa yang lagi kamu pikirin?"
+    # Ultimate fallback — diversified
+    ultimate = [
+        "Hmm, cerita lebih yuk. Ada apa yang lagi kamu pikirin?",
+        "Duh, kedengarannya ada yang lagi jalan di otak. Cerita dong?",
+        "Ada apa nih yang bikin kamu message aku?",
+        "Aku di sini kok, cerita aja kamu lagi apa.",
+    ]
+    return random.choice(ultimate)
 
 # ============================================================================
 # CSS (unchanged)
@@ -800,10 +1024,10 @@ def main():
 
             # Generate AI response
             emo_name = EMOTION_NAMES_ID.get(emotion, 'netral')
-            response = generate_ai_response(user_text, emo_name, st.session_state.messages)
+            response = generate_ai_response(user_text, emo_name, st.session_state.messages, st.session_state.last_bot_responses)
 
-            # Avoid duplicates
-            if response and response in st.session_state.last_bot_responses[-3:]:
+            # Avoid duplicates (additional safety check)
+            if response and is_duplicate_response(response, st.session_state.last_bot_responses):
                 response = None
             
             if not response:
