@@ -423,7 +423,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
 .stApp { background: #f1f5f9 !important; }
 .main > div { background: transparent !important; max-width: 860px; }
 
-/* Hide chrome */
+/* Hide chrome — keep collapsedControl so sidebar can reopen */
 #MainMenu, footer, header { visibility: hidden !important; }
 [data-testid="stToolbar"] { display: none !important; }
 
@@ -432,7 +432,7 @@ section[data-testid="stSidebar"] {
     background: #ffffff !important;
     border-right: 1px solid #e2e8f0 !important;
 }
-section[data-testid="stSidebar"] * { color: #334155 !important; }
+section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] span, section[data-testid="stSidebar"] label, section[data-testid="stSidebar"] .stMarkdown { color: #334155 !important; }
 section[data-testid="stSidebar"] hr { border-color: #e2e8f0 !important; }
 section[data-testid="stSidebar"] .stButton > button {
     background: transparent !important;
@@ -453,14 +453,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     color: #1e293b !important;
 }
 
-/* Active nav button — applied via key trick */
-.nav-active > button {
-    background: #eff6ff !important;
-    color: #2563eb !important;
-    font-weight: 600 !important;
-}
-
-/* Chat messages */
+/* Chat messages — CRITICAL: don't override text color globally */
 [data-testid="stChatMessage"] {
     background: white !important;
     border: 1px solid #f1f5f9 !important;
@@ -468,6 +461,13 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     padding: 14px 16px !important;
     margin-bottom: 8px !important;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+}
+
+/* Ensure chat text is always visible */
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] span,
+[data-testid="stChatMessage"] div {
+    color: #1e293b !important;
 }
 
 /* User message — blue tint */
@@ -673,7 +673,7 @@ def main():
         avatar  = '👤' if is_user else EMO_ICON.get(emo_id, '🐼')
         role    = 'user' if is_user else 'assistant'
         with st.chat_message(role, avatar=avatar):
-            st.write(msg['content'])
+            st.markdown(msg['content'])
 
     # ── Input — native st.chat_input() ───────────────────────────────────────
     ph = "Ketik pesan..." if st.session_state.mode == 'curhat' else "Jawab A atau B..."
