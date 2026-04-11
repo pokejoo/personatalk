@@ -248,14 +248,21 @@ SYSTEM_PROMPT = """Kamu adalah PersonaTalk — teman curhat digital yang beneran
 KARAKTER:
 Teman dekat yang dengerin dulu sebelum ngasih saran. Natural, hangat, kadang playful, tidak pernah judgmental. Bukan AI, bukan konselor — teman.
 
+WAJIB BACA KONTEKS:
+- Selalu baca riwayat percakapan sebelum balas
+- Kalau user sudah jawab pertanyaanmu, JANGAN tanya hal yang sama lagi
+- Lanjutkan dari informasi yang sudah mereka kasih — acknowledge, lalu gali lebih dalam atau kasih respons yang relevan
+- Contoh SALAH: user bilang "ketemu di cafe" tapi bot masih nanya "kamu tau dari mana?"
+- Contoh BENAR: user bilang "ketemu di cafe" → bot respond soal perasaan waktu ketemu langsung di sana
+
 CARA BALAS:
 - Bahasa Indonesia sehari-hari, santai, boleh campur english kalau natural
 - 2-4 kalimat maksimal — pendek, padat, ngena
 - SELALU validasi perasaan dulu sebelum kasih insight atau solusi
-- Akhiri dengan 1 pertanyaan terbuka yang relevan ke situasi mereka
+- Akhiri dengan 1 pertanyaan terbuka yang BERBEDA dari pertanyaan sebelumnya
 - Jangan bullet point, jangan formal, jangan template korporat
 - Vary pembuka setiap response: "Duh", "Ooh", "Ya Allah", "Aduh", "Hmm", "Serius?", "Oof", "Wah", "Astaga"
-- Jangan ulangi pembuka atau closing pattern dari response sebelumnya
+- JANGAN ulangi kalimat atau pertanyaan yang sudah pernah kamu tulis sebelumnya
 - Jangan pernah sebut diri sebagai AI, bot, atau assistant
 
 PANDUAN EMOSI:
@@ -267,13 +274,13 @@ PANDUAN EMOSI:
 - Capek/burnout → empati dulu, tanya ini capek fisik atau emosional
 
 SOLUSI:
-Kalau user udah cerita cukup banyak (3+ exchange) dan butuh action, boleh kasih 1-2 saran konkret yang praktis — tapi tetap tanya apakah itu yang mereka mau atau cukup didengarkan dulu.
+Kalau user udah cerita cukup banyak (3+ exchange), boleh kasih 1-2 saran konkret yang praktis sambil tetap tanya apa yang mereka butuhkan.
 
 JANGAN:
 - Diagnosis medis atau psikologis
-- Saran yang bisa membahayakan
+- Tanya pertanyaan yang sudah dijawab user
+- Ulangi kalimat yang sama persis dari response sebelumnya
 - Template corporate ("Saya mengerti perasaan Anda")
-- Response yang sama persis dengan sebelumnya
 - Lebih dari 4 kalimat
 - Bullet point atau list"""
 
@@ -282,70 +289,51 @@ JANGAN:
 # ============================================================================
 
 def build_conversation_context(messages: list, emotion_label) -> str:
-    recent = messages[-10:-1] if len(messages) > 1 else []
+    recent = messages[-12:-1] if len(messages) > 1 else []
     context_lines = []
     for msg in recent:
         role = "User" if msg['role'] == 'user' else "PersonaTalk"
         context_lines.append(f"{role}: {msg['content']}")
     context = "\n".join(context_lines) if context_lines else "Awal percakapan"
     emotion_name = EMOTION_NAMES_ID.get(emotion_label, "Netral") if isinstance(emotion_label, int) else str(emotion_label)
+
+    # Extract last bot question to explicitly warn Claude not to repeat it
+    last_bot_q = ""
+    for msg in reversed(messages[:-1]):
+        if msg['role'] == 'bot' and '?' in msg['content']:
+            last_bot_q = f"\nPertanyaanmu terakhir: \"{msg['content'].strip()}\"\nJANGAN ulangi pertanyaan ini — user sudah menjawabnya."
+            break
+
     return f"""=== RIWAYAT PERCAKAPAN ===
 {context}
-
-=== STATUS SAAT INI ===
-Emosi user terdeteksi: {emotion_name}
-Jumlah pesan: {len(messages)}"""
+{last_bot_q}
+=== STATUS ===
+Emosi user: {emotion_name} | Jumlah pesan: {len(messages)}"""
 
 # ============================================================================
 # DUPLICATE DETECTION
 # ============================================================================
 
-def extract_response_signature(text: str) -> dict:
-    if not text:
-        return {}
-    text_clean = text.strip()
-    words = text_clean.split()
-    opening = ' '.join(words[:2]).lower() if len(words) >= 2 else text_clean[:20].lower()
-    closing  = ' '.join(words[-5:]).lower() if len(words) >= 5 else text_clean[-20:].lower()
-    has_cerita = "cerita" in text_clean.lower()
-    has_how    = any(w in text_clean.lower() for w in ["gimana", "bagaimana", "apa", "siapa"])
-    return {
-        'opening': opening,
-        'closing': closing,
-        'sentence_count': len([s for s in text_clean.split('.') if s.strip()]),
-        'has_cerita': has_cerita,
-        'has_how': has_how,
-    }
 
-def is_duplicate_response(new_response: str, last_bot_responses: list, threshold: float = 0.65) -> bool:
+def is_duplicate_response(new_response: str, last_bot_responses: list, threshold: float = 0.55) -> bool:
     if not last_bot_responses or not new_response:
         return False
-    new_sig = extract_response_signature(new_response)
-    if not new_sig:
-        return False
+    new_clean = new_response.strip().lower()
     for old_response in last_bot_responses[-3:]:
-        old_sig = extract_response_signature(old_response)
-        if not old_sig:
-            continue
-        score = 0
-        max_score = 6.5
-        if new_sig['opening'] == old_sig['opening']:
-            score += 2
-        elif any(w in new_sig['opening'] for w in old_sig['opening'].split()):
-            score += 1
-        if new_sig['closing'] == old_sig['closing']:
-            score += 1.5
-        if new_sig['sentence_count'] == old_sig['sentence_count']:
-            score += 0.5
-        if new_sig['has_cerita'] and old_sig['has_cerita']:
-            score += 1
-        if new_sig['has_how'] and old_sig['has_how']:
-            score += 0.5
-        new_words = set(new_response.lower().split())
-        old_words = set(old_response.lower().split())
-        if len(new_words & old_words) / max(len(new_words | old_words), 1) > 0.7:
-            score += 1
-        if score / max_score > threshold:
+        old_clean = old_response.strip().lower()
+        # Hard check: exact or near-exact match
+        if new_clean == old_clean:
+            return True
+        # Check word overlap (Jaccard similarity)
+        new_words = set(new_clean.split())
+        old_words = set(old_clean.split())
+        jaccard = len(new_words & old_words) / max(len(new_words | old_words), 1)
+        if jaccard > threshold:
+            return True
+        # Check if first sentence is identical (most obvious repeat pattern)
+        new_first = new_clean.split('.')[0].strip()
+        old_first = old_clean.split('.')[0].strip()
+        if new_first and old_first and new_first == old_first:
             return True
     return False
 
@@ -859,18 +847,39 @@ def main():
             if mbti_pred and mbti_conf > 0.3:
                 st.session_state.current_mbti = mbti_pred
 
-            response = generate_ai_response(
-                user_text,
-                emotion,
-                st.session_state.messages,
-                st.session_state.last_bot_responses
-            )
+            # Try AI — regenerate up to 2x if duplicate
+            response = None
+            for attempt in range(2):
+                candidate = generate_ai_response(
+                    user_text,
+                    emotion,
+                    st.session_state.messages,
+                    st.session_state.last_bot_responses
+                )
+                if candidate and not is_duplicate_response(candidate, st.session_state.last_bot_responses):
+                    response = candidate
+                    break
 
-            if response and is_duplicate_response(response, st.session_state.last_bot_responses):
-                response = None
-
+            # Hard fallback if AI fails or keeps duplicating
             if not response:
                 response = smart_fallback_response(user_text, emotion, st.session_state.messages)
+                # Make sure fallback itself is not a duplicate
+                if is_duplicate_response(response, st.session_state.last_bot_responses):
+                    # Force a completely different response from the other pool
+                    fallback_pool = [
+                        "Hmm, gimana kamu ngerasa sekarang setelah cerita ini?",
+                        "Aduh, berat banget ya. Ada hal lain yang bikin situasi ini makin susah?",
+                        "Ooh, aku dengerin. Kamu mau cerita lebih soal itu?",
+                        "Duh, pasti butuh waktu buat proses ini semua. Kamu lagi butuh didengar atau mau cari solusi?",
+                        "Ya ampun, itu nggak gampang sama sekali. Sekarang kamu lagi ada support dari siapa?",
+                    ]
+                    # Pick one that's not duplicate
+                    for opt in random.sample(fallback_pool, len(fallback_pool)):
+                        if not is_duplicate_response(opt, st.session_state.last_bot_responses):
+                            response = opt
+                            break
+                    else:
+                        response = fallback_pool[0]  # worst case, just use it
 
             st.session_state.last_bot_responses.append(response)
             if len(st.session_state.last_bot_responses) > 10:
