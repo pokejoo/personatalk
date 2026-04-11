@@ -1,6 +1,7 @@
 """
-🐼 PersonaTalk — Streamlit App
+🐼 PersonaTalk — Streamlit App [IMPROVED VERSION]
 Deploy ke Streamlit Cloud via GitHub
+Optimized untuk natural, empathetic responses menggunakan Gemini + Claude
 """
 
 import streamlit as st
@@ -9,6 +10,7 @@ import re
 import os
 import random
 import joblib
+from datetime import datetime
 
 # NLTK
 import nltk
@@ -243,150 +245,257 @@ def format_mbti_result(mbti_type: str) -> str:
     )
 
 # ============================================================================
-# AI RESPONSE — Anthropic Claude + Gemini fallback
+# ENHANCED SYSTEM PROMPT
 # ============================================================================
 
-SYSTEM_PROMPT = """Kamu adalah PersonaTalk — sahabat curhat digital yang beneran peduli, bukan robot atau konselor formal.
+SYSTEM_PROMPT = """Kamu adalah PersonaTalk — sahabat curhat digital yang BENERAN peduli, bukan robot atau konselor formal.
 
-KARAKTER KAMU:
-Kamu seperti teman yang udah kenal lama — hangat, nyambung, dan nggak pernah ngehakimin. Kamu dengerin beneran sebelum kasih solusi.
+KARAKTER & KEPRIBADIAN:
+• Seperti teman dekat yang udah kenal lama — natural, hangat, nyambung
+• Dengerin beneran, validasi perasaan SEBELUM kasih solusi
+• Punya humor santai, tapi tau kapan waktu serius
+• Tidak pernah menghakimi, malah encourage user untuk eksplorasi perasaan mereka
+• Empatik tapi juga bisa playful tergantung context
 
 CARA NGOBROL:
-- Bahasa Indonesia sehari-hari, santai, campuran indo-english boleh
-- SELALU validasi perasaan dulu sebelum kasih saran atau insight
-- Empati harus terasa nyata — bukan template kayak "aku mengerti perasaanmu"
-- Gunakan ekspresi natural: "duh", "hmm", "ya Allah", "aduh", "serius?"
-- Panjang respons: 2-4 kalimat, nggak lebih
-- Akhiri dengan SATU pertanyaan terbuka yang relevan dan spesifik
-- Jangan pakai bullet point atau format kaku
-- Jangan sebut diri sebagai AI atau bot
-- Jangan ulangi kalimat yang sama dengan respons sebelumnya
+✓ Bahasa Indonesia sehari-hari, santai, boleh code-mixing indo-english
+✓ Mulai dengan VALIDASI perasaan yang SPESIFIK, bukan template generic
+✓ Gunakan ekspresi natural: "duh", "hmm", "ya Allah", "aduh", "serius?", "oof"
+✓ Panjang: 2-4 kalimat maksimal, short and snappy
+✓ Akhiri dengan 1 pertanyaan terbuka yang RELEVAN dan PERSONAL
+✓ Jangan pakai format bullet point atau struktur kaku
+✓ Jangan sebut diri sebagai AI, bot, atau assistant
+✓ Jangan ulangi pola kalimat yang sama di response sebelumnya
 
-KALAU USER SEDIH/GALAU: peluk dulu secara verbal, baru tanya
-KALAU USER MARAH: acknowledge kemarahannya, jangan minta calm down
-KALAU USER BINGUNG: temenin dulu, jangan langsung kasih solusi
-KALAU USER CERITA TENTANG ORANG LAIN (gebetan, teman, dll): ikut excited/empati sesuai konteks
+PANDUAN PER EMOSI:
+[SEDIH/GALAU] → "Peluk virtual dulu, baru tanya" — acknowledge kehilangannya, tanya about timeline
+  Contoh: "Duh, 2 tahun tuh banyak banget waktu sama seseorang... pasti sekarang rasanya kosong banget ya? Kamu udah cerita ke siapa aja?"
+  
+[MARAH] → Acknowledge kemarahannya sebagai valid, jangan bilang "calm down"
+  Contoh: "Oof, tuh jelas bikin kesel. Kemarahan itu valid sih — ada apa sih yang paling bikin kamu naik darah?"
+  
+[BINGUNG/OVERWHELM] → Temenin dulu, jangan langsung kasih solusi
+  Contoh: "Hmm, kedengarannya overwhelming banget ya. Kamu ngerasa bingung soal apa yang paling — feeling atau fakta?"
+  
+[SENANG/EXCITED] → Ikut excited! Energy match mereka
+  Contoh: "Wah, ada yang bagus nih kayaknya! Cerita dong — udah berapa lama kenal?"
+  
+[CINTA/NAKSIR] → Supportive tapi juga realistic, gak naïf
+  Contoh: "Ooh, menarik! Gimana perasaan kamu — ini crush biasa atau beneran jatuh cinta nih?"
+  
+[CEMAS/ANXIETY] → Validate kecemasannya, tanya apakah ini overthinking atau ada alasan real
+  Contoh: "Ngerti banget, kekhawatiran itu nyesek. Tapi ini kamu cemas soal hal yang udah terjadi atau yang belum?"
 
-JANGAN:
-- Diagnosis medis/psikologis
-- Saran berbahaya
-- Kalimat pembuka yang sama terus-menerus
-- Kalimat: "Perasaan seperti ini sangat manusiawi kok" — terlalu template"""
+PENTING — JANGAN:
+✗ Diagnosis medis/psikologis ("kamu mungkin depresi")
+✗ Saran berbahaya atau minimisasi perasaan
+✗ Pembuka yang sama terus-menerus ("Perasaan seperti ini sangat manusiawi kok")
+✗ Template corporate ("Saya mengerti apa yang Anda rasakan")
+✗ Long paragraphs — 2-4 kalimat aja
+✗ Repeat previous response patterns
+✗ Assume context jika user ngasih respons pendek — tanya klarifikasi instead
+
+ADVANCED — BACA KONTEKS:
+• Kalau user cerita ambiguous, pick up dari conversation history — apa topik sebelumnya?
+• Kalau user pendek banget ("iya" / "udah"), gunakan context dari pesan sebelumnya untuk frame respons
+• Kalau duplikat mood (user cerita putus relationship berkali-kali), acknowledge pola itu dengan gentle humor
+• Kalau conversation udah lama (10+ messages), user mungkin butuh action/insight, bukan cuman validasi lagi
+
+TONE = mix antara:
+• Warm & caring (kayak teman dekat)
+• Slightly playful (bukan robotic)
+• Slightly irreverent (bisa ada casual curse words kalau natural)
+• Protective (nutipin mereka)
+• Real (nggak fake-empati, genuine curiosity)
+
+REMEMBER: Kamu bukan therapist, kamu teman. Teman itu honest, gak selalu gentle, tapi always there."""
+
+def build_conversation_context(messages: list, emotion: int) -> str:
+    """
+    Build context dari conversation history + emotion state.
+    Ini yang bakal di-inject ke dalam prompt buat Gemini/Claude.
+    """
+    # Ambil 5-8 pesan sebelumnya untuk context
+    recent = messages[-10:-1] if len(messages) > 1 else []
+    
+    context_lines = []
+    for msg in recent:
+        role = "User" if msg['role'] == 'user' else "PersonaTalk"
+        context_lines.append(f"{role}: {msg['content']}")
+    
+    context = "\n".join(context_lines) if context_lines else "Awal percakapan"
+    emotion_label = EMOTION_NAMES_ID.get(emotion, "Netral")
+    
+    return f"""=== CONVERSATION CONTEXT ===
+{context}
+
+=== CURRENT STATE ===
+User's emotional state: {emotion_label}
+Message count: {len(messages)}
+
+=== TASK ===
+Respond to the user's last message in a natural, empathetic way. 
+Keep it to 2-4 sentences max. End with ONE genuine follow-up question."""
 
 def generate_ai_response(user_text: str, emotion_label: str, history: list) -> str:
-    # Build context
-    ctx = ""
-    if len(history) > 1:
-        lines = []
-        for m in history[-6:-1]:
-            role = "User" if m["role"] == "user" else "PersonaTalk"
-            lines.append(f"{role}: {m['content']}")
-        if lines:
-            ctx = "Percakapan sebelumnya:\n" + "\n".join(lines) + "\n\n"
+    """
+    Generate response using Gemini (primary) atau Claude (fallback).
+    Optimized untuk natural, contextual responses.
+    """
+    context = build_conversation_context(history, emotion_label)
+    
+    user_prompt = f"""{context}
 
-    user_prompt = (
-        f"{ctx}Pesan user: \"{user_text}\"\n"
-        f"Emosi terdeteksi: {emotion_label}\n\n"
-        f"Balas sebagai PersonaTalk — natural, hangat, manusiawi, spesifik ke situasinya. "
-        f"Jangan template. Max 3-4 kalimat."
-    )
+User's last message: "{user_text}"
 
-    # === ANTHROPIC CLAUDE (primary — lebih natural) ===
+Respond as PersonaTalk — warm, natural, specific to their situation. 
+No templates, no corporate speak, just genuine friend energy."""
+
+    # === GEMINI (primary — lebih cepat) ===
+    if _GENAI_OK and GEMINI_API_KEY:
+        try:
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            response = model.generate_content(
+                content=f"{SYSTEM_PROMPT}\n\n{user_prompt}",
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.9,  # Higher untuk creativity, tapi controlled
+                    top_p=0.95,
+                    max_output_tokens=250,
+                    top_k=40,
+                ),
+                safety_settings=[
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_NONE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_NONE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                    },
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                    },
+                ],
+            )
+            result = response.text.strip()
+            # Clean up markdown
+            result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)  # remove bold
+            result = re.sub(r'##\s+', '', result)  # remove headers
+            result = result.strip()
+            
+            if result and len(result) > 10:
+                return result
+        except Exception as e:
+            st.session_state['_last_ai_error'] = f"Gemini error: {str(e)[:80]}"
+
+    # === CLAUDE (fallback) ===
     if _ANTHROPIC_OK and ANTHROPIC_KEY:
         try:
             client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
             msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
+                model="claude-opus-4-1",
+                max_tokens=250,
+                temperature=0.9,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_prompt}]
             )
-            result = msg.content[0].text.strip().replace("**", "").replace("##", "")
+            result = msg.content[0].text.strip()
+            result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)
             if result:
+                st.session_state['_last_ai_error'] = None
                 return result
         except Exception as e:
-            st.session_state['_last_ai_error'] = f"Anthropic: {str(e)[:100]}"
-
-    # === GEMINI (fallback) ===
-    if _GENAI_OK and GEMINI_API_KEY:
-        try:
-            model  = genai.GenerativeModel("gemini-2.0-flash")
-            resp   = model.generate_content(f"{SYSTEM_PROMPT}\n\n{user_prompt}")
-            result = resp.text.strip().replace("**", "").replace("##", "")
-            if result:
-                st.session_state['_last_ai_error'] = None  # clear error kalau Gemini berhasil
-                return result
-        except Exception as e:
-            prev = st.session_state.get('_last_ai_error', '')
-            st.session_state['_last_ai_error'] = (prev or '') + f" | Gemini: {str(e)[:100]}"
+            prev_err = st.session_state.get('_last_ai_error', '')
+            st.session_state['_last_ai_error'] = (prev_err + " | " if prev_err else "") + f"Claude: {str(e)[:80]}"
 
     return None
 
-def fallback_response(text: str, emotion: int, history: list = None) -> str:
-    """Fallback yang context-aware — baca history kalau pesan pendek/nggak informatif."""
+def smart_fallback_response(text: str, emotion: int, history: list = None) -> str:
+    """
+    Smart fallback yang context-aware dan lebih natural.
+    Digunakan kalau API gagal atau tidak tersedia.
+    """
     t = text.lower().strip()
-
-    # Kalau pesan sangat pendek (< 4 kata), cari konteks dari history
+    
+    # Build full context dari history
     full_context = t
-    if len(t.split()) < 4 and history:
-        # Gabung beberapa pesan user terakhir untuk konteks
-        user_msgs = [m['content'].lower() for m in history if m['role'] == 'user']
-        full_context = ' '.join(user_msgs[-4:])
-
-    fc = full_context  # shorthand
-
+    if history:
+        user_msgs = [m['content'].lower() for m in history[-5:] if m['role'] == 'user']
+        full_context = ' '.join(user_msgs)
+    
+    fc = full_context
+    
+    # === PATTERN-BASED SMART RESPONSES ===
+    
+    # Relationship breakup / putus
     if any(w in fc for w in ['putus','selingkuh','ditinggal','diputus','diselingkuhin','dikhianatin']):
-        opts = [
-            'Aduh, 2 tahun itu bukan waktu yang sebentar... pasti banyak banget kenangan yang bikin ini makin berat. Sekarang kamu lagi di mana, sendirian atau sama seseorang?',
-            'Duh, diselingkuhin setelah 2 tahun itu nyakitin banget. Kamu masih sering kepikiran dia nggak?',
-            'Ya Allah, itu berat banget. Wajar kalau sekarang rasanya campur aduk — marah, sedih, bingung semuanya barengan. Gimana kondisi kamu hari ini?',
-        ]
-    elif any(w in fc for w in ['bingung','harus apa','mau ngapain','ga ada','nggak ada','tanpa dia','belum']):
-        # "belum" dalam konteks putus/selingkuh = belum cerita ke siapa-siapa
-        if any(w in fc for w in ['putus','selingkuh','ditinggal','cerita']):
-            opts = [
-                'Iya, kadang susah nyari orang yang bisa beneran dengerin ya. Kamu udah berapa lama nahan ini sendirian?',
-                'Nggak apa-apa, aku di sini kok. Mau cerita lebih detail — gimana awalnya kamu tau dia selingkuh?',
-            ]
+        if '2 tahun' in fc or 'bertahun' in fc:
+            return "Duh, 2 tahun tuh banyak banget waktu sama seseorang... pasti sekarang rasanya campur aduk banget ya? Kamu masih sering kepikiran dia?"
+        elif 'selingkuh' in fc:
+            return "Ya Allah, diselingkuhin setelah sekian lama itu sadis banget. Kamu tau dari mana sampai ketahuan?"
         else:
-            opts = [
-                'Hmm, ngerasa kayak tiba-tiba harus jalan sendiri dan bingung mulai dari mana ya? Kamu udah lama sama dia?',
-                'Kehilangan seseorang yang udah jadi bagian besar dari hidup tuh emang bikin kosong. Yang paling bikin kamu kepikiran sekarang apa?',
-            ]
-    elif any(w in fc for w in ['capek','lelah','exhausted','burnout']):
-        opts = [
-            'Hmm, capek yang kayak gini beda sama capek biasa. Ini capek dari mana — fisik, pikiran, atau keduanya?',
-            'Ngerasa kelelahan kayak gini tanda kamu udah ngasih banyak banget. Udah berapa lama ngerasa kayak gini?',
-        ]
-    elif any(w in fc for w in ['suka','naksir','gebetan','pdkt','cantik','ganteng','kangen']):
-        opts = [
-            'Wah, ada yang spesial nih kayaknya! Cerita dong lebih — udah lama kenal?',
-            'Ooh, menarik! Dia tau nggak kalau kamu naksir? Atau masih tahap ngira-ngira?',
-        ]
-    elif emotion == 3:
-        opts = [
-            'Iya aku ngerti, situasi kayak gitu emang bikin darah naik. Boleh cerita lebih — ini karena apa?',
-            'Wajar banget kesel. Kemarahan itu sering sinyal kalau ada yang beneran nggak beres. Udah lama nahan ini?',
-        ]
-    elif emotion == 4:
-        opts = [
-            'Hmm, ngerasa cemas itu nggak enak banget ya. Ini soal apa yang paling bikin kamu khawatir?',
-            'Overthinking paling susah dimatiin emang. Kamu cemas soal hal yang udah terjadi atau yang belum?',
-        ]
-    elif emotion == 0:
-        opts = [
-            'Duh, kedengarannya berat banget... cerita lebih dong, aku dengerin.',
-            'Hmm, ada yang lagi dipikirin nih. Mau cerita dari mana dulu?',
-        ]
-    else:
-        opts = [
-            'Hmm, cerita lebih yuk. Aku dengerin kok — ada apa?',
-            'Duh, kayaknya ada yang lagi dipikirin nih. Mau cerita lebih?',
-        ]
-    return random.choice(opts)
+            return "Aduh, putus tuh emang nyakitin. Sekarang kamu gimana — sendirian atau ada yang support?"
+    
+    # Confusion / bingung
+    if any(w in fc for w in ['bingung','harus apa','mau ngapain','ga tahu','nggak tahu','blank']):
+        if any(w in fc for w in ['dia','orang','teman']):
+            return "Hmm, ngerasa bingung sama situasi orang lain itu emang susah. Cerita lebih detail — dia yang perlu bantuan atau kamu yang bingung gimana bantu dia?"
+        else:
+            return "Ngerasa blank kayak gini berat ya... ini bingung soal hidup sehari-hari atau soal keputusan besar?"
+    
+    # Longing / rindu / kangen
+    if any(w in fc for w in ['rindu','kangen','ketinggalan','missing','long for','udah berapa lama']):
+        if 'dia' in fc or 'dia' in t:
+            return "Ooh, kangen yang kayak gini berat. Dia masih reply chat kamu nggak? Atau udah jauh-jauh?"
+        else:
+            return "Rindu kayak gini biasanya signal ada yang kita miss. Kamu rindu sama orang atau sama situasi dulu?"
+    
+    # Happy / excited
+    if emotion == 1 or any(w in fc for w in ['happy','senang','excited','yay','wohoo','bagus banget']):
+        return "Wah, ada yang bagus nih! Cerita dong lebih — ini senang karena apa?"
+    
+    # Anger
+    if emotion == 3 or any(w in fc for w in ['marah','kesal','benci','emosi','ngebully','ngehina']):
+        if 'dibohongin' in fc or 'ditipu' in fc:
+            return "Oof, dibohongin tuh bikin marah dan kecewa bersamaan. Udah lama dia gini atau baru ketahuan?"
+        else:
+            return "Iya, kemarahan itu valid sih. Tapi ini marah sama orang atau situasinya yang bikin frustasi?"
+    
+    # Anxiety / cemas
+    if emotion == 4 or any(w in fc for w in ['cemas','khawatir','panik','gelisah','overthinking','was-was','deg degan']):
+        return "Ngerti banget, kekhawatiran tuh nyesek. Ini kamu cemas soal hal yang udah terjadi atau yang belum — overthinking gitu?"
+    
+    # Surprise / shock
+    if emotion == 5 or any(w in fc for w in ['kaget','shock','astaga','nggak nyangka','unexpected']):
+        return "Serius? Itu shocking banget! Cerita dong — apaan yang bikin kamu kaget gini?"
+    
+    # Crush / naksir
+    if any(w in fc for w in ['suka','naksir','gebetan','pdkt','cantik','ganteng','jatuh cinta','crush']):
+        if 'cerita' in fc or 'bilang' in fc:
+            return "Ooh, menarik! Dia tau nggak kalau kamu naksir? Atau masih tahap investigate?"
+        else:
+            return "Wah, ada yang spesial nih kayaknya! Lama kenal atau baru kenal?"
+    
+    # Exhaustion / capek
+    if any(w in fc for w in ['capek','lelah','exhausted','burnout','tired','tepar','ngos-ngosan']):
+        return "Capek yang kayak gini beda ya, bukan cuman fisik doang. Ini capek dari school/work atau personal life?"
+    
+    # Default based on emotion
+    if emotion == 0:
+        return "Duh, kedengarannya berat banget. Mau cerita lebih detail? Aku dengerin kok."
+    elif emotion == 2:
+        return "Ooh, ada yang berwarna ya! Cerita dong siapa dia."
+    
+    # Ultimate fallback
+    return "Hmm, cerita lebih yuk. Ada apa yang lagi kamu pikirin?"
 
 # ============================================================================
-# CSS
+# CSS (unchanged)
 # ============================================================================
 
 def inject_css():
@@ -633,16 +742,16 @@ def main():
                 del st.session_state[k]
             st.rerun()
 
-        # Debug: tampilkan status AI (bisa dihapus setelah presentasi)
+        # Debug: AI status
         ai_err = st.session_state.get('_last_ai_error')
         if ai_err:
             st.markdown("---")
             st.markdown(f'<span style="color:#e74c3c;font-size:0.75rem;">⚠️ {ai_err}</span>', unsafe_allow_html=True)
         else:
-            if ANTHROPIC_KEY:
-                st.markdown('<span style="color:#00ffc8;font-size:0.75rem;">🟢 Claude AI aktif</span>', unsafe_allow_html=True)
-            elif GEMINI_API_KEY:
-                st.markdown('<span style="color:#f39c12;font-size:0.75rem;">🟡 Gemini AI aktif</span>', unsafe_allow_html=True)
+            if GEMINI_API_KEY:
+                st.markdown('<span style="color:#00ffc8;font-size:0.75rem;">🟢 Gemini AI aktif</span>', unsafe_allow_html=True)
+            elif ANTHROPIC_KEY:
+                st.markdown('<span style="color:#f39c12;font-size:0.75rem;">🟡 Claude AI aktif</span>', unsafe_allow_html=True)
             else:
                 st.markdown('<span style="color:#e74c3c;font-size:0.75rem;">🔴 AI tidak aktif — cek Secrets</span>', unsafe_allow_html=True)
 
@@ -693,11 +802,12 @@ def main():
             emo_name = EMOTION_NAMES_ID.get(emotion, 'netral')
             response = generate_ai_response(user_text, emo_name, st.session_state.messages)
 
-            # Hindari duplikat
+            # Avoid duplicates
             if response and response in st.session_state.last_bot_responses[-3:]:
                 response = None
+            
             if not response:
-                response = fallback_response(user_text, emotion, st.session_state.messages)
+                response = smart_fallback_response(user_text, emotion, st.session_state.messages)
 
             st.session_state.last_bot_responses.append(response)
             if len(st.session_state.last_bot_responses) > 10:
