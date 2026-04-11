@@ -285,35 +285,8 @@ JANGAN:
 - Bullet point atau list"""
 
 # ============================================================================
-# CONVERSATION CONTEXT BUILDER
-# ============================================================================
-
-def build_conversation_context(messages: list, emotion_label) -> str:
-    recent = messages[-12:-1] if len(messages) > 1 else []
-    context_lines = []
-    for msg in recent:
-        role = "User" if msg['role'] == 'user' else "PersonaTalk"
-        context_lines.append(f"{role}: {msg['content']}")
-    context = "\n".join(context_lines) if context_lines else "Awal percakapan"
-    emotion_name = EMOTION_NAMES_ID.get(emotion_label, "Netral") if isinstance(emotion_label, int) else str(emotion_label)
-
-    # Extract last bot question to explicitly warn Claude not to repeat it
-    last_bot_q = ""
-    for msg in reversed(messages[:-1]):
-        if msg['role'] == 'bot' and '?' in msg['content']:
-            last_bot_q = f"\nPertanyaanmu terakhir: \"{msg['content'].strip()}\"\nJANGAN ulangi pertanyaan ini — user sudah menjawabnya."
-            break
-
-    return f"""=== RIWAYAT PERCAKAPAN ===
-{context}
-{last_bot_q}
-=== STATUS ===
-Emosi user: {emotion_name} | Jumlah pesan: {len(messages)}"""
-
-# ============================================================================
 # DUPLICATE DETECTION
 # ============================================================================
-
 
 def is_duplicate_response(new_response: str, last_bot_responses: list, threshold: float = 0.55) -> bool:
     if not last_bot_responses or not new_response:
@@ -321,76 +294,154 @@ def is_duplicate_response(new_response: str, last_bot_responses: list, threshold
     new_clean = new_response.strip().lower()
     for old_response in last_bot_responses[-3:]:
         old_clean = old_response.strip().lower()
-        # Hard check: exact or near-exact match
         if new_clean == old_clean:
             return True
-        # Check word overlap (Jaccard similarity)
         new_words = set(new_clean.split())
         old_words = set(old_clean.split())
         jaccard = len(new_words & old_words) / max(len(new_words | old_words), 1)
         if jaccard > threshold:
             return True
-        # Check if first sentence is identical (most obvious repeat pattern)
         new_first = new_clean.split('.')[0].strip()
         old_first = old_clean.split('.')[0].strip()
-        if new_first and old_first and new_first == old_first:
+        if new_first and old_first and len(new_first) > 10 and new_first == old_first:
             return True
     return False
 
 # ============================================================================
-# AI RESPONSE GENERATOR — CLAUDE PRIMARY, GEMINI FALLBACK
+# AI RESPONSE GENERATOR — CLAUDE PRIMARY (MULTI-TURN), GEMINI FALLBACK
 # ============================================================================
 
-def generate_ai_response(user_text: str, emotion_label, history: list, last_bot_responses: list = None) -> str:
-    context = build_conversation_context(history, emotion_label)
+def build_claude_messages(history: list, emotion_label, last_bot_responses: list) -> list:
+    """
+    Build proper multi-turn messages for Claude API.
+    Claude requires alternating user/assistant roles — we map:
+        bot   → assistant
+        user  → user
+    We also inject a system-level note about emotion + no-repeat into
+    the FIRST user turn so it doesn't break the alternating pattern.
+    """
+    emotion_name = EMOTION_NAMES_ID.get(emotion_label, "Netral") if isinstance(emotion_label, int) else str(emotion_label)
 
-    recent_responses_text = ""
+    # Build recent history (exclude the very last user message — that's sent separately)
+    # history[-1] is the current user message already appended before calling this
+    recent = history[-13:-1] if len(history) > 1 else []
+
+    # Collapse consecutive same-role messages (safety: Claude API rejects them)
+    collapsed = []
+    for msg in recent:
+        api_role = "assistant" if msg['role'] == 'bot' else "user"
+        if collapsed and collapsed[-1]['role'] == api_role:
+            collapsed[-1]['content'] += "\n" + msg['content']
+        else:
+            collapsed.append({'role': api_role, 'content': msg['content']})
+
+    # Build no-repeat hint
+    no_repeat = ""
     if last_bot_responses:
-        recent = last_bot_responses[-2:]
-        recent_responses_text = "\n\nJANGAN ulangi pola dari response-response sebelumnya ini:\n"
-        for i, resp in enumerate(recent, 1):
-            recent_responses_text += f"{i}. {resp}\n"
+        no_repeat = "\n\n[INTERNAL NOTE — jangan ulangi pola ini:\n"
+        for r in last_bot_responses[-2:]:
+            no_repeat += f"- {r[:80]}...\n"
+        no_repeat += "]"
 
-    user_prompt = f"""{context}{recent_responses_text}
+    # Inject emotion note into first user turn (or create one if history is empty)
+    emotion_note = f"[Emosi user saat ini terdeteksi: {emotion_name}]{no_repeat}"
 
-Pesan terakhir user: "{user_text}"
+    if collapsed and collapsed[0]['role'] == 'user':
+        collapsed[0]['content'] = emotion_note + "\n\n" + collapsed[0]['content']
+    else:
+        # Insert a synthetic user turn at the beginning if first msg is assistant
+        collapsed.insert(0, {'role': 'user', 'content': emotion_note})
+        # Then we need an assistant ack to keep alternating — skip if collapsed[1] is already assistant
+        if len(collapsed) > 1 and collapsed[1]['role'] != 'assistant':
+            collapsed.insert(1, {'role': 'assistant', 'content': 'Oke, aku dengerin.'})
 
-Balas sebagai PersonaTalk — teman dekat yang hangat, natural, spesifik ke situasi mereka.
-Wajib: 2-4 kalimat saja. Variasikan pembuka. Jangan ulangi pola response sebelumnya."""
+    # Ensure we end with a user turn (the current message)
+    current_user_msg = history[-1]['content'] if history and history[-1]['role'] == 'user' else ""
+    if current_user_msg:
+        if collapsed and collapsed[-1]['role'] == 'user':
+            collapsed[-1]['content'] += "\n" + current_user_msg
+        else:
+            collapsed.append({'role': 'user', 'content': current_user_msg})
 
-    # ── CLAUDE (PRIMARY) ────────────────────────────────────────────────────
+    # Final safety: must start with 'user'
+    if collapsed and collapsed[0]['role'] != 'user':
+        collapsed.insert(0, {'role': 'user', 'content': emotion_note})
+
+    return collapsed
+
+
+def clean_response(text: str) -> str:
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'##\s+', '', text)
+    text = re.sub(r'\[INTERNAL NOTE.*?\]', '', text, flags=re.DOTALL)
+    return text.strip()
+
+
+def generate_ai_response(user_text: str, emotion_label, history: list, last_bot_responses: list = None) -> str:
+    last_bot_responses = last_bot_responses or []
+
+    # ── CLAUDE PRIMARY — proper multi-turn messages ──────────────────────────
     if _ANTHROPIC_OK and ANTHROPIC_KEY:
         try:
+            claude_messages = build_claude_messages(history, emotion_label, last_bot_responses)
             client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
             msg = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=300,
+                max_tokens=350,
                 temperature=0.85,
                 system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_prompt}]
+                messages=claude_messages,
             )
-            result = msg.content[0].text.strip()
-            result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)
-            result = re.sub(r'##\s+', '', result)
-            result = result.strip()
+            result = clean_response(msg.content[0].text)
             if result and len(result) > 10:
-                if not is_duplicate_response(result, last_bot_responses or []):
+                if not is_duplicate_response(result, last_bot_responses):
                     st.session_state['_last_ai_error'] = None
                     st.session_state['_ai_provider']   = 'claude'
                     return result
+                # If duplicate, ask Claude to retry with explicit instruction
+                retry_messages = claude_messages + [
+                    {'role': 'assistant', 'content': result},
+                    {'role': 'user', 'content': 'Response itu terlalu mirip dengan yang sebelumnya. Coba dengan pembuka dan pertanyaan yang berbeda sama sekali.'}
+                ]
+                retry_msg = client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=350,
+                    temperature=0.95,
+                    system=SYSTEM_PROMPT,
+                    messages=retry_messages,
+                )
+                retry_result = clean_response(retry_msg.content[0].text)
+                if retry_result and len(retry_result) > 10:
+                    st.session_state['_last_ai_error'] = None
+                    st.session_state['_ai_provider']   = 'claude'
+                    return retry_result
         except Exception as e:
-            st.session_state['_last_ai_error'] = f"Claude error: {str(e)[:100]}"
+            st.session_state['_last_ai_error'] = f"Claude error: {str(e)[:120]}"
 
-    # ── GEMINI (FALLBACK) ───────────────────────────────────────────────────
+    # ── GEMINI FALLBACK ──────────────────────────────────────────────────────
     if _GENAI_OK and GEMINI_API_KEY:
+        # Build context string for Gemini (it doesn't support multi-turn the same way)
+        emotion_name = EMOTION_NAMES_ID.get(emotion_label, "Netral") if isinstance(emotion_label, int) else str(emotion_label)
+        recent = history[-10:-1] if len(history) > 1 else []
+        ctx_lines = [("User" if m['role']=='user' else "PersonaTalk") + ": " + m['content'] for m in recent]
+        no_repeat_hint = ""
+        if last_bot_responses:
+            no_repeat_hint = "\nJANGAN ulangi: " + " | ".join(r[:60] for r in last_bot_responses[-2:])
+
+        gemini_prompt = (
+            f"Emosi user: {emotion_name}\n\n"
+            f"Riwayat:\n" + "\n".join(ctx_lines) +
+            f"\n\nPesan terakhir user: \"{user_text}\"\n{no_repeat_hint}\n\n"
+            f"Balas sebagai PersonaTalk. 2-4 kalimat, natural, variasikan pembuka."
+        )
         try:
             model    = genai.GenerativeModel("gemini-2.0-flash")
             response = model.generate_content(
-                content=f"{SYSTEM_PROMPT}\n\n{user_prompt}",
+                content=f"{SYSTEM_PROMPT}\n\n{gemini_prompt}",
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.85,
                     top_p=0.95,
-                    max_output_tokens=300,
+                    max_output_tokens=350,
                     top_k=40,
                 ),
                 safety_settings=[
@@ -400,12 +451,9 @@ Wajib: 2-4 kalimat saja. Variasikan pembuka. Jangan ulangi pola response sebelum
                     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
                 ],
             )
-            result = response.text.strip()
-            result = re.sub(r'\*\*(.+?)\*\*', r'\1', result)
-            result = re.sub(r'##\s+', '', result)
-            result = result.strip()
+            result = clean_response(response.text)
             if result and len(result) > 10:
-                if not is_duplicate_response(result, last_bot_responses or []):
+                if not is_duplicate_response(result, last_bot_responses):
                     st.session_state['_last_ai_error'] = None
                     st.session_state['_ai_provider']   = 'gemini'
                     return result
