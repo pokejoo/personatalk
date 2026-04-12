@@ -625,6 +625,10 @@ def main():
         status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
         st.caption(f"AI Status: {status}")
 
+        st.write("Claude key:", bool(ANTHROPIC_KEY))
+        st.write("Gemini key:", bool(GEMINI_KEY))
+        st.write("Error:", st.session_state.get('_ai_err'))
+
     # ── MAIN CONTENT ─────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
     
