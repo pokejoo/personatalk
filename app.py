@@ -1,5 +1,5 @@
 """
-🐼 PersonaTalk — Custom UI (Groq Backend)
+🐼 PersonaTalk — Fixed UI
 """
 
 import streamlit as st
@@ -326,7 +326,6 @@ def mood_donut_svg(emo_counts):
            f'<text x="{cx}" y="{cy+10}" text-anchor="middle" fill="white" font-size="9" font-weight="bold">{dom_pct}%</text>'
            f'</svg>')
 
-    # Mood list rows
     top3 = sorted([(i, pcts[i]) for i in range(6) if pcts[i] > 0.01], key=lambda x:-x[1])[:3]
     rows = ""
     for i, p in top3:
@@ -338,55 +337,99 @@ def mood_donut_svg(emo_counts):
     if not rows:
         rows = '<span style="color:rgba(255,255,255,0.6);font-size:12px;">Mulai chat...</span>'
 
-    # Mood label
     dom = dominant
     mood_label = "Mood bagus! 🌟" if dom == 1 else "Mood oke 👍" if dom in [2,5] else "Perlu perhatian 💙"
-
     return svg, rows, mood_label
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
-def inject_css():
-    st.markdown("""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INJECT CSS — semua layout dikontrol dari sini
+# ══════════════════════════════════════════════════════════════════════════════
+def inject_css(sidebar_open: bool):
+    sidebar_w = "220px" if sidebar_open else "0px"
+    st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
-* { box-sizing: border-box; }
+/* ── Reset & Base ── */
+*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-html, body, [class*="css"], .stApp {
+html, body, .stApp {{
     font-family: 'Poppins', sans-serif !important;
-    margin: 0; padding: 0;
-}
+    height: 100% !important;
+    overflow: hidden !important;
+}}
 
-.stApp {
+/* Background gradient */
+.stApp {{
     background: linear-gradient(135deg, #1a3a6b 0%, #2a5ba8 50%, #4a90d9 100%) !important;
-    min-height: 100vh;
-}
+}}
 
-/* Hide Streamlit chrome */
-#MainMenu, footer, header, [data-testid="stToolbar"],
-[data-testid="stDecoration"], [data-testid="stStatusWidget"] {
-    display: none !important; visibility: hidden !important;
-}
+/* ── Hide Streamlit chrome ── */
+#MainMenu, footer, header,
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+[data-testid="stChatInput"],
+section[data-testid="stSidebar"] {{
+    display: none !important;
+    visibility: hidden !important;
+}}
 
-/* Remove default padding */
-.main .block-container {
+/* ── Lock main container ── */
+.main .block-container {{
     padding: 0 !important;
-    max-width: 100% !important;
-}
+    max-width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}}
 
-/* Streamlit sidebar — hide it, we use custom */
-section[data-testid="stSidebar"] { display: none !important; }
+/* ── Scrollbar ── */
+::-webkit-scrollbar {{ width: 4px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.3); border-radius: 4px; }}
 
-/* Button resets */
-.stButton > button {
-    font-family: 'Poppins', sans-serif !important;
-}
+/* ── SIDEBAR (fixed, real CSS) ── */
+#pt-sidebar {{
+    position: fixed;
+    top: 0; left: 0;
+    width: {sidebar_w};
+    height: 100vh;
+    background: #f0f4ff;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    z-index: 999;
+    overflow: hidden;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}}
 
-/* Chat input hidden — we use custom */
-[data-testid="stChatInput"] { display: none !important; }
+#pt-sidebar-inner {{
+    width: 220px;
+    min-width: 220px;
+    height: 100%;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}}
 
-/* Text input styling */
-.stTextInput > div > div > input {
+/* ── MAIN AREA (offset by sidebar) ── */
+#pt-main {{
+    position: fixed;
+    top: 0;
+    left: {sidebar_w};
+    right: 0;
+    height: 100vh;
+    padding: 24px 28px;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}}
+
+/* ── Text input ── */
+.stTextInput > div > div > input {{
     background: transparent !important;
     border: none !important;
     outline: none !important;
@@ -395,37 +438,227 @@ section[data-testid="stSidebar"] { display: none !important; }
     font-size: 14px !important;
     color: #1e293b !important;
     padding: 0 !important;
-}
+    caret-color: #3b82f6 !important;
+}}
+.stTextInput > div {{
+    background: white !important;
+    border-radius: 28px !important;
+    padding: 10px 18px !important;
+    border: none !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.10) !important;
+}}
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
+/* ── Buttons — sidebar nav ── */
+button[data-testid="baseButton-secondary"] {{
+    font-family: 'Poppins', sans-serif !important;
+    border-radius: 40px !important;
+    border: none !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    padding: 9px 14px !important;
+    margin-bottom: 2px !important;
+    color: #334155 !important;
+    background: transparent !important;
+    transition: all 0.18s ease !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+}}
+button[data-testid="baseButton-secondary"]:hover {{
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    transform: translateX(3px) !important;
+}}
 
-/* MBTI buttons */
-.mbti-btn {
-    display: inline-block;
-    width: 100%;
-    padding: 14px 20px;
-    margin-bottom: 10px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.15);
-    border: 2px solid rgba(255,255,255,0.3);
-    color: white;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-    font-family: 'Poppins', sans-serif;
-}
-.mbti-btn:hover {
-    background: rgba(255,255,255,0.25);
-    border-color: rgba(255,255,255,0.6);
-}
+/* Toggle button */
+#toggle-btn button {{
+    background: rgba(255,255,255,0.18) !important;
+    border-radius: 12px !important;
+    color: white !important;
+    font-size: 18px !important;
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    backdrop-filter: blur(8px) !important;
+    transition: all 0.2s !important;
+}}
+#toggle-btn button:hover {{
+    background: rgba(255,255,255,0.28) !important;
+    transform: scale(1.08) !important;
+}}
+
+/* Send button */
+#send-btn button {{
+    background: #3b82f6 !important;
+    border-radius: 50% !important;
+    color: white !important;
+    font-size: 16px !important;
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.5) !important;
+    transition: all 0.2s !important;
+}}
+#send-btn button:hover {{
+    background: #2563eb !important;
+    transform: scale(1.08) !important;
+    box-shadow: 0 6px 20px rgba(59,130,246,0.6) !important;
+}}
+
+/* MBTI choice buttons */
+.mbti-choice button {{
+    background: #f0f4ff !important;
+    color: #1e293b !important;
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    height: auto !important;
+    white-space: normal !important;
+    line-height: 1.5 !important;
+    transition: all 0.18s !important;
+    width: 100% !important;
+}}
+.mbti-choice button:hover {{
+    background: #3b82f6 !important;
+    color: white !important;
+    border-color: #3b82f6 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(59,130,246,0.35) !important;
+}}
+
+/* Reset/general action buttons */
+.action-btn button {{
+    background: #f0f4ff !important;
+    color: #334155 !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    font-size: 13px !important;
+    padding: 10px 20px !important;
+    transition: all 0.18s !important;
+}}
+.action-btn button:hover {{
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SIDEBAR HTML
+# ══════════════════════════════════════════════════════════════════════════════
+def render_sidebar_html(nav, mode):
+    def nav_item(key, icon, label, is_nav=True):
+        active_nav   = nav == key
+        active_mode  = mode == key
+        active       = active_nav or active_mode
+        bg    = "#3b82f6" if active else "transparent"
+        color = "white"   if active else "#334155"
+        fw    = "700"     if active else "500"
+        return f"""
+        <div style="
+            background:{bg};
+            color:{color};
+            border-radius:40px;
+            padding:9px 14px;
+            margin-bottom:4px;
+            font-size:13px;
+            font-weight:{fw};
+            display:flex;
+            align-items:center;
+            gap:10px;
+            cursor:pointer;
+            transition:all 0.18s;
+        ">{icon} {label}</div>"""
+
+    items_nav = [
+        ("dashboard", "🏠", "Dashboard"),
+        ("riwayat",   "🕐", "Riwayat Chat"),
+        ("tentang",   "ℹ️",  "Tentang"),
+    ]
+    items_panel = [
+        ("curhat", "💬", "Curhat"),
+        ("mbti",   "🧠", "Analisis MBTI"),
+    ]
+
+    nav_html  = "".join(nav_item(k, i, l) for k, i, l in items_nav)
+    pan_html  = "".join(nav_item(k, i, l, False) for k, i, l in items_panel)
+    set_bg    = "#3b82f6" if nav=="setelan" else "transparent"
+    set_col   = "white"   if nav=="setelan" else "#334155"
+
+    return f"""
+    <div id="pt-sidebar">
+      <div id="pt-sidebar-inner">
+        <!-- Logo -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+          <span style="color:#e53e3e;font-size:24px;font-weight:900;">✳</span>
+          <div style="line-height:1.15;">
+            <div style="font-size:16px;font-weight:900;color:#1e293b;">persona</div>
+            <div style="font-size:16px;font-weight:900;color:#1e293b;">talk</div>
+          </div>
+        </div>
+
+        <!-- Search bar (decorative) -->
+        <div style="
+          background:white;
+          border-radius:20px;
+          padding:9px 14px;
+          display:flex;
+          align-items:center;
+          gap:8px;
+          margin-bottom:22px;
+          border:1px solid #e2e8f0;
+        ">
+          <span style="color:#94a3b8;font-size:14px;">🔍</span>
+          <span style="color:#94a3b8;font-size:13px;">Cari...</span>
+        </div>
+
+        <!-- Nav items -->
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;
+                    letter-spacing:0.08em;margin-bottom:8px;padding-left:4px;">MENU</div>
+        {nav_html}
+
+        <!-- Panel items -->
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;
+                    letter-spacing:0.08em;margin:18px 0 8px;padding-left:4px;">PANEL ANALISIS</div>
+        {pan_html}
+
+        <!-- Spacer -->
+        <div style="flex:1;min-height:20px;"></div>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0;">
+
+        <!-- Settings -->
+        <div style="
+            background:{set_bg};
+            color:{set_col};
+            border-radius:40px;
+            padding:9px 14px;
+            font-size:13px;
+            font-weight:500;
+            display:flex;
+            align-items:center;
+            gap:10px;
+            cursor:pointer;
+        ">⚙️ Setelan</div>
+      </div>
+    </div>
+    """
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAIN
+# ══════════════════════════════════════════════════════════════════════════════
 def main():
     st.set_page_config(
         page_title="PersonaTalk",
@@ -433,12 +666,10 @@ def main():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
-    inject_css()
 
     with st.spinner("Memuat PersonaTalk..."):
         emo_model, emo_vec, mbti_model, mbti_vec = load_models()
 
-    # Session state defaults
     defaults = {
         'messages':     [{'role':'bot','content':'Halo, Talk Friend! 👋 Aku PersonaTalk.\nCerita apa aja, aku dengerin ya!'}],
         'emotion':      1, 'confidence': 0.5,
@@ -446,333 +677,277 @@ def main():
         'last_bot':     [], 'emo_counts': {i:0 for i in range(6)},
         '_provider':    None, '_ai_err': None,
         'sidebar_open': True,
-        'mode':         'curhat',       # 'curhat' | 'mbti'
-        'nav':          'dashboard',    # 'dashboard' | 'riwayat' | 'tentang' | 'setelan'
+        'mode':         'curhat',
+        'nav':          'dashboard',
         'mbti_step':    0,
         'mbti_resp':    [],
         'mbti_result':  None,
-        'chat_input':   '',
+        '_last_input':  '',
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-    emo_id   = st.session_state.emotion
-    sidebar  = st.session_state.sidebar_open
-    mode     = st.session_state.mode
+    sidebar = st.session_state.sidebar_open
+    nav     = st.session_state.nav
+    mode    = st.session_state.mode
 
-    # ── LAYOUT: sidebar + main ────────────────────────────────────────────────
+    # Inject CSS first
+    inject_css(sidebar)
+
+    # Render sidebar HTML (pure HTML, no Streamlit columns)
+    st.markdown(render_sidebar_html(nav, mode), unsafe_allow_html=True)
+
+    # ── Sidebar click handlers (invisible Streamlit buttons overlaid) ─────────
+    # We use a hidden container for the actual interactive buttons
+    # The HTML sidebar above is purely visual / shows state
+    with st.container():
+        st.markdown('<div style="position:fixed;top:0;left:0;width:220px;height:100vh;z-index:1000;pointer-events:none;"></div>', unsafe_allow_html=True)
+
+    # Real sidebar buttons — rendered in a fixed-position overlay
+    sb_css = """
+    <style>
+    #sidebar-btns {
+        position: fixed;
+        top: 160px;
+        left: 0;
+        width: 220px;
+        z-index: 1001;
+        padding: 0 16px;
+    }
+    #sidebar-btns button {
+        opacity: 0 !important;
+        position: relative !important;
+        height: 38px !important;
+        width: 100% !important;
+        margin-bottom: 4px !important;
+        cursor: pointer !important;
+        pointer-events: all !important;
+    }
+    #sidebar-panel-btns {
+        position: fixed;
+        top: 390px;
+        left: 0;
+        width: 220px;
+        z-index: 1001;
+        padding: 0 16px;
+    }
+    #sidebar-panel-btns button {
+        opacity: 0 !important;
+        position: relative !important;
+        height: 38px !important;
+        width: 100% !important;
+        margin-bottom: 4px !important;
+        cursor: pointer !important;
+        pointer-events: all !important;
+    }
+    #sidebar-settings-btn {
+        position: fixed;
+        bottom: 32px;
+        left: 0;
+        width: 220px;
+        z-index: 1001;
+        padding: 0 16px;
+    }
+    #sidebar-settings-btn button {
+        opacity: 0 !important;
+        height: 38px !important;
+        width: 100% !important;
+        pointer-events: all !important;
+    }
+    </style>
+    """
     if sidebar:
-        left_w, main_w = 220, 980
-        col_sidebar, col_main = st.columns([220, 980])
-    else:
-        col_sidebar = None
-        col_main    = st.columns([1])[0]
+        st.markdown(sb_css, unsafe_allow_html=True)
+        st.markdown('<div id="sidebar-btns">', unsafe_allow_html=True)
+        if st.button("Dashboard",    key="nav_dash"):
+            st.session_state.nav = 'dashboard'; st.rerun()
+        if st.button("Riwayat Chat", key="nav_riwayat"):
+            st.session_state.nav = 'riwayat'; st.rerun()
+        if st.button("Tentang",      key="nav_tentang"):
+            st.session_state.nav = 'tentang'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div id="sidebar-panel-btns">', unsafe_allow_html=True)
+        if st.button("Curhat",         key="mode_curhat"):
+            st.session_state.mode = 'curhat'; st.session_state.nav = 'dashboard'; st.rerun()
+        if st.button("Analisis MBTI",  key="mode_mbti"):
+            st.session_state.mode = 'mbti'; st.session_state.nav = 'dashboard'
+            st.session_state.mbti_step = 0; st.session_state.mbti_resp = []
+            st.session_state.mbti_result = None; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div id="sidebar-settings-btn">', unsafe_allow_html=True)
+        if st.button("Setelan", key="nav_setelan"):
+            st.session_state.nav = 'setelan'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════════════
-    # SIDEBAR
+    # MAIN AREA wrapper
     # ══════════════════════════════════════════════════════════════════════════
-    if sidebar and col_sidebar:
-        with col_sidebar:
-            nav   = st.session_state.nav
-            _mode = st.session_state.mode
+    sidebar_w = "220px" if sidebar else "0px"
+    st.markdown(f'<div id="pt-main">', unsafe_allow_html=True)
 
-            def nav_style(key):
-                active = (nav == key) or (_mode == key)
-                return (
-                    "background:#3b82f6;color:white;border-radius:40px;padding:8px 14px;"
-                    "margin-bottom:4px;cursor:pointer;display:block;font-size:13px;"
-                    "font-weight:600;border:none;width:100%;text-align:left;"
-                ) if active else (
-                    "background:transparent;color:#334155;border-radius:40px;padding:8px 14px;"
-                    "margin-bottom:4px;cursor:pointer;display:block;font-size:13px;"
-                    "font-weight:500;border:none;width:100%;text-align:left;"
-                )
+    # ── TOP BAR ───────────────────────────────────────────────────────────────
+    tb_cols = st.columns([0.5, 8, 1])
+    with tb_cols[0]:
+        st.markdown('<div id="toggle-btn">', unsafe_allow_html=True)
+        toggle_lbl = "✕" if sidebar else "☰"
+        if st.button(toggle_lbl, key="sidebar_toggle"):
+            st.session_state.sidebar_open = not sidebar
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div style="
-                background:#f0f4ff;
-                border-radius:0 20px 20px 0;
-                padding:20px 16px;
-                height:100vh;
-                position:fixed;
-                top:0; left:0;
-                width:220px;
-                box-shadow:4px 0 20px rgba(0,0,0,0.15);
-                display:flex;
-                flex-direction:column;
-                z-index:100;
-                overflow-y:auto;
-            ">
-                <!-- Logo -->
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-                    <span style="color:#e53e3e;font-size:22px;font-weight:800;">✳</span>
-                    <div>
-                        <div style="font-size:15px;font-weight:800;color:#1e293b;line-height:1.1;">persona</div>
-                        <div style="font-size:15px;font-weight:800;color:#1e293b;line-height:1.1;">talk</div>
-                    </div>
+    # ── DASHBOARD ─────────────────────────────────────────────────────────────
+    if nav == 'dashboard':
+        svg, mood_rows, mood_label = mood_donut_svg(st.session_state.emo_counts)
+
+        h1, h2 = st.columns([3, 2])
+        with h1:
+            st.markdown("""
+            <div style="padding:6px 0 16px;">
+                <div style="font-size:2.2rem;font-weight:800;color:white;line-height:1.2;">
+                    Halo, Talk Friend! 👋
                 </div>
-
-                <!-- Search -->
-                <div style="
-                    background:white;
-                    border-radius:20px;
-                    padding:8px 12px;
-                    display:flex;
-                    align-items:center;
-                    gap:8px;
-                    margin-bottom:20px;
-                    border:1px solid #e2e8f0;
-                ">
-                    <span style="color:#94a3b8;font-size:14px;">🔍</span>
-                    <span style="color:#94a3b8;font-size:13px;">Cari...</span>
+                <div style="font-size:1rem;color:rgba(255,255,255,0.75);margin-top:4px;">
+                    Bagaimana kabar mu hari ini?
                 </div>
-
-                <!-- Nav -->
-                <div style="font-size:11px;color:#94a3b8;font-weight:600;margin-bottom:8px;padding-left:4px;">MENU</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Nav buttons — menggunakan st.button untuk interaktivitas
-            st.markdown('<div style="height:190px;"></div>', unsafe_allow_html=True)
-
-            if st.button("🏠  Dashboard", key="nav_dash", use_container_width=True):
-                st.session_state.nav = 'dashboard'
-                st.rerun()
-            if st.button("🕐  Riwayat Chat", key="nav_riwayat", use_container_width=True):
-                st.session_state.nav = 'riwayat'
-                st.rerun()
-            if st.button("ℹ️  Tentang", key="nav_tentang", use_container_width=True):
-                st.session_state.nav = 'tentang'
-                st.rerun()
-
-            st.markdown('<div style="margin:12px 0 6px;font-size:11px;color:#94a3b8;font-weight:600;padding-left:4px;">PANEL ANALISIS</div>', unsafe_allow_html=True)
-
-            if st.button("💬  Curhat", key="mode_curhat", use_container_width=True):
-                st.session_state.mode = 'curhat'
-                st.session_state.nav  = 'dashboard'
-                st.rerun()
-            if st.button("🧠  Analisis MBTI", key="mode_mbti", use_container_width=True):
-                st.session_state.mode    = 'mbti'
-                st.session_state.nav     = 'dashboard'
-                st.session_state.mbti_step   = 0
-                st.session_state.mbti_resp   = []
-                st.session_state.mbti_result = None
-                st.rerun()
-
-            st.markdown('<div style="flex:1;"></div>', unsafe_allow_html=True)
-            st.markdown('<hr style="border-color:#e2e8f0;margin:12px 0;">', unsafe_allow_html=True)
-
-            if st.button("⚙️  Setelan", key="nav_setelan", use_container_width=True):
-                st.session_state.nav = 'setelan'
-                st.rerun()
-
-            # Style the sidebar buttons
+        with h2:
             st.markdown(f"""
-            <style>
-            [data-testid="stButton"] > button {{
-                font-family: 'Poppins', sans-serif !important;
-                border-radius: 40px !important;
-                border: none !important;
-                font-size: 13px !important;
-                font-weight: 500 !important;
-                text-align: left !important;
-                padding: 8px 14px !important;
-                margin-bottom: 2px !important;
-                color: #334155 !important;
-                background: transparent !important;
-                transition: all 0.15s !important;
-            }}
-            [data-testid="stButton"] > button:hover {{
-                background: #e8f0fe !important;
-                color: #1e40af !important;
-            }}
-            /* Active mode button highlight */
-            {"" }
-            </style>
+            <div style="
+                background:rgba(255,255,255,0.12);
+                border-radius:20px;
+                padding:14px 18px;
+                backdrop-filter:blur(10px);
+                border:1px solid rgba(255,255,255,0.2);
+            ">
+                <div style="color:white;font-weight:700;font-size:12px;
+                            margin-bottom:10px;letter-spacing:0.03em;">
+                    🎯 Detektor Mood Hari Ini
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div>{svg}</div>
+                    <div style="flex:1;">
+                        {mood_rows}
+                        <div style="margin-top:6px;color:rgba(255,255,255,0.9);
+                                    font-size:12px;font-weight:600;">{mood_label}</div>
+                    </div>
+                </div>
+            </div>
             """, unsafe_allow_html=True)
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # MAIN AREA
-    # ══════════════════════════════════════════════════════════════════════════
-    with col_main:
-        main_pad = "220px" if sidebar else "0px"
+        st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
 
-        st.markdown(f"""
-        <div style="
-            margin-left:{main_pad};
-            padding:24px 28px;
-            min-height:100vh;
-        ">
-        """, unsafe_allow_html=True)
+        # ── MODE LABEL (changes by mode) ──────────────────────────────────────
+        mode_title = "💬 Curhat" if mode == "curhat" else "🧠 Analisis MBTI"
 
-        # ── TOP BAR ──────────────────────────────────────────────────────────
-        topbar_col1, topbar_col2 = st.columns([1, 3])
-        with topbar_col1:
-            toggle_label = "✕" if sidebar else "☰"
-            if st.button(toggle_label, key="sidebar_toggle"):
-                st.session_state.sidebar_open = not sidebar
-                st.rerun()
+        # ── WHITE CARD ────────────────────────────────────────────────────────
+        if mode == 'curhat':
+            # ── Chat card ─────────────────────────────────────────────────────
+            st.markdown(f"""
+            <div style="
+                background:white;
+                border-radius:20px;
+                padding:18px 22px 14px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.12);
+                flex:1;
+                display:flex;
+                flex-direction:column;
+                overflow:hidden;
+            ">
+            <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:12px;">
+                {mode_title}
+            </div>
+            <!-- chat messages scroll area -->
+            <div id="chat-scroll" style="
+                flex:1;
+                overflow-y:auto;
+                padding-right:4px;
+                min-height:0;
+                max-height:320px;
+            ">
+            """, unsafe_allow_html=True)
 
-        st.markdown("""
-        <style>
-        div[data-testid="stButton"]:has(button[kind="secondary"]) button {
-            background: rgba(255,255,255,0.2) !important;
-            color: white !important;
-            border-radius: 10px !important;
-            font-size: 18px !important;
-            width: 42px !important;
-            height: 42px !important;
-            padding: 0 !important;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        nav = st.session_state.nav
-
-        # ── DASHBOARD ─────────────────────────────────────────────────────────
-        if nav == 'dashboard':
-            # Header + Mood Panel
-            svg, mood_rows, mood_label = mood_donut_svg(st.session_state.emo_counts)
-            h_col1, h_col2 = st.columns([3, 2])
-
-            with h_col1:
-                st.markdown("""
-                <div style="padding:10px 0 20px;">
-                    <div style="font-size:2.4rem;font-weight:800;color:white;line-height:1.15;">
-                        Halo, Talk Friend! 👋
+            # Chat messages
+            for msg in st.session_state.messages:
+                if msg['role'] == 'user':
+                    st.markdown(f"""
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                        <div style="
+                            background:linear-gradient(135deg,#3b82f6,#2a5ba8);
+                            border-radius:18px 18px 4px 18px;
+                            padding:10px 16px;
+                            max-width:68%;
+                            font-size:13.5px;
+                            color:white;
+                            line-height:1.5;
+                            box-shadow:0 2px 8px rgba(59,130,246,0.3);
+                        ">{msg['content']}</div>
                     </div>
-                    <div style="font-size:1rem;color:rgba(255,255,255,0.8);margin-top:6px;">
-                        Bagaimana kabar mu hari ini?
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="display:flex;justify-content:flex-start;margin-bottom:10px;">
+                        <div style="
+                            background:linear-gradient(135deg,#4a90d9,#2a5ba8);
+                            border-radius:18px 18px 18px 4px;
+                            padding:10px 16px;
+                            max-width:68%;
+                            font-size:13.5px;
+                            color:white;
+                            line-height:1.5;
+                            box-shadow:0 2px 8px rgba(42,91,168,0.25);
+                            border:1px solid rgba(255,255,255,0.15);
+                        ">{msg['content']}</div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with h_col2:
-                st.markdown(f"""
-                <div style="
-                    background:rgba(255,255,255,0.12);
-                    border-radius:20px;
-                    padding:16px 20px;
-                    backdrop-filter:blur(10px);
-                    border:1px solid rgba(255,255,255,0.2);
-                ">
-                    <div style="color:white;font-weight:700;font-size:13px;margin-bottom:10px;">
-                        🎯 Detektor Mood Hari Ini
-                    </div>
-                    <div style="display:flex;align-items:center;gap:14px;">
-                        <div>{svg}</div>
-                        <div style="flex:1;">
-                            {mood_rows}
-                            <div style="margin-top:8px;color:rgba(255,255,255,0.9);
-                                        font-size:12px;font-weight:600;">{mood_label}</div>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-
-            # ── MODE: CURHAT ──────────────────────────────────────────────────
-            if mode == 'curhat':
-                st.markdown("""
-                <div style="
-                    background:white;
-                    border-radius:20px;
-                    padding:20px 24px 80px;
-                    box-shadow:0 8px 32px rgba(0,0,0,0.12);
-                    min-height:420px;
-                    position:relative;
-                ">
-                <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:16px;">
-                    💬 Curhat
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Chat messages
-                msgs = st.session_state.messages
-                for msg in msgs:
-                    if msg['role'] == 'user':
-                        st.markdown(f"""
-                        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                            <div style="
-                                background:#c5cff5;
-                                border-radius:18px 18px 4px 18px;
-                                padding:10px 16px;
-                                max-width:70%;
-                                font-size:14px;
-                                color:#1e293b;
-                                line-height:1.5;
-                            ">{msg['content']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"""
-                        <div style="display:flex;justify-content:flex-start;margin-bottom:10px;">
-                            <div style="
-                                background:#f0f4ff;
-                                border-radius:18px 18px 18px 4px;
-                                padding:10px 16px;
-                                max-width:70%;
-                                font-size:14px;
-                                color:#1e293b;
-                                line-height:1.5;
-                                border:1px solid #e2e8f0;
-                            ">{msg['content']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                st.markdown("</div>", unsafe_allow_html=True)
-
-                # ── Chat Input Bar ────────────────────────────────────────────
-                st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
-                inp_col1, inp_col2, inp_col3 = st.columns([0.5, 8, 1])
-
-                with inp_col1:
-                    st.markdown("""
-                    <div style="
-                        width:38px;height:38px;
-                        background:rgba(255,255,255,0.2);
-                        border-radius:50%;
-                        display:flex;align-items:center;justify-content:center;
-                        color:white;font-size:18px;
-                        cursor:pointer;margin-top:4px;
-                    ">+</div>
                     """, unsafe_allow_html=True)
 
-                with inp_col2:
-                    user_input = st.text_input(
-                        label="",
-                        placeholder="Ketik pesan...",
-                        key="chat_text_input",
-                        label_visibility="collapsed",
-                    )
-                    st.markdown("""
-                    <style>
-                    div[data-testid="stTextInput"] > div {
-                        background: white !important;
-                        border-radius: 24px !important;
-                        padding: 6px 16px !important;
-                        border: none !important;
-                        box-shadow: 0 2px 12px rgba(0,0,0,0.08) !important;
-                    }
-                    div[data-testid="stTextInput"] > div > div > input {
-                        color: #1e293b !important;
-                        font-size: 14px !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
+            st.markdown("</div></div>", unsafe_allow_html=True)  # close scroll + card
 
-                with inp_col3:
-                    send_btn = st.button("✈️", key="send_btn")
+            # Auto-scroll JS
+            st.markdown("""
+            <script>
+            const el = document.getElementById('chat-scroll');
+            if (el) el.scrollTop = el.scrollHeight;
+            </script>
+            """, unsafe_allow_html=True)
 
-                # Process input
-                if (send_btn or (user_input and user_input.strip() and
-                    st.session_state.get('_last_input') != user_input)) and user_input and user_input.strip():
+            # ── Input bar (outside the card, pinned) ─────────────────────────
+            st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+            ic1, ic2, ic3 = st.columns([0.4, 8, 0.8])
 
+            with ic1:
+                st.markdown("""
+                <div style="
+                    width:38px;height:38px;
+                    background:rgba(255,255,255,0.2);
+                    border-radius:50%;
+                    display:flex;align-items:center;justify-content:center;
+                    color:white;font-size:18px;
+                    cursor:pointer;margin-top:4px;
+                    border:1px solid rgba(255,255,255,0.3);
+                ">+</div>
+                """, unsafe_allow_html=True)
+
+            with ic2:
+                user_input = st.text_input(
+                    label="",
+                    placeholder="Ketik pesan...",
+                    key="chat_text_input",
+                    label_visibility="collapsed",
+                )
+
+            with ic3:
+                st.markdown('<div id="send-btn">', unsafe_allow_html=True)
+                send_btn = st.button("✈️", key="send_btn")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # Process
+            if (send_btn or user_input) and user_input and user_input.strip():
+                if st.session_state.get('_last_input') != user_input:
                     st.session_state['_last_input'] = user_input
                     user_text = user_input.strip()
                     st.session_state.messages.append({'role':'user','content':user_text})
@@ -794,201 +969,180 @@ def main():
                     st.session_state.messages.append({'role':'bot','content':response})
                     st.rerun()
 
-            # ── MODE: MBTI ────────────────────────────────────────────────────
-            elif mode == 'mbti':
-                st.markdown("""
-                <div style="
-                    background:white;
-                    border-radius:20px;
-                    padding:28px 32px;
-                    box-shadow:0 8px 32px rgba(0,0,0,0.12);
-                    min-height:420px;
-                ">
-                <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:20px;">
-                    🧠 Analisis MBTI
+        # ── MODE: MBTI ────────────────────────────────────────────────────────
+        elif mode == 'mbti':
+            st.markdown(f"""
+            <div style="
+                background:white;
+                border-radius:20px;
+                padding:24px 28px;
+                box-shadow:0 8px 32px rgba(0,0,0,0.12);
+                overflow-y:auto;
+                max-height:440px;
+            ">
+            <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:18px;">
+                {mode_title}
+            </div>
+            """, unsafe_allow_html=True)
+
+            step   = st.session_state.mbti_step
+            result = st.session_state.mbti_result
+
+            if result:
+                name, desc = MBTI_DESC.get(result, ("Unknown", "Tipe kepribadian unik."))
+                dims = "".join(
+                    f'<div style="padding:8px 14px;background:#f0f4ff;border-radius:10px;'
+                    f'margin-bottom:8px;font-size:13px;color:#334155;">'
+                    f'<b style="color:#3b82f6;">{d}</b> — {DIM_EXP.get(d,"")}</div>'
+                    for d in result if d in DIM_EXP
+                )
+                st.markdown(f"""
+                <div style="text-align:center;padding:16px 0;">
+                    <div style="font-size:3rem;font-weight:800;color:#3b82f6;margin-bottom:8px;">{result}</div>
+                    <div style="font-size:1.05rem;font-weight:700;color:#1e293b;margin-bottom:6px;">{name}</div>
+                    <div style="font-size:14px;color:#64748b;margin-bottom:22px;">{desc}</div>
+                    <div style="text-align:left;max-width:480px;margin:0 auto;">{dims}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-                step   = st.session_state.mbti_step
-                result = st.session_state.mbti_result
+                st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+                st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+                if st.button("🔄 Ulangi Analisis", key="reset_mbti"):
+                    st.session_state.mbti_step   = 0
+                    st.session_state.mbti_resp   = []
+                    st.session_state.mbti_result = None
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
-                if result:
-                    # Show result
-                    name, desc = MBTI_DESC.get(result, ("Unknown", "Tipe kepribadian unik."))
-                    dims = "".join(
-                        f'<div style="padding:8px 14px;background:#f0f4ff;border-radius:10px;'
-                        f'margin-bottom:8px;font-size:13px;color:#334155;">'
-                        f'<b style="color:#3b82f6;">{d}</b> — {DIM_EXP.get(d,"")}</div>'
-                        for d in result if d in DIM_EXP
-                    )
-                    st.markdown(f"""
-                    <div style="text-align:center;padding:20px 0;">
-                        <div style="font-size:3rem;font-weight:800;color:#3b82f6;margin-bottom:8px;">{result}</div>
-                        <div style="font-size:1.1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">{name}</div>
-                        <div style="font-size:14px;color:#64748b;margin-bottom:24px;">{desc}</div>
-                        <div style="text-align:left;max-width:500px;margin:0 auto;">{dims}</div>
+            elif step < len(MBTI_Q):
+                q        = MBTI_Q[step]
+                progress = int(step / len(MBTI_Q) * 100)
+                st.markdown(f"""
+                <div style="margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;
+                                font-size:12px;color:#94a3b8;margin-bottom:6px;">
+                        <span>Pertanyaan {step+1} dari {len(MBTI_Q)}</span>
+                        <span>{progress}%</span>
                     </div>
-                    """, unsafe_allow_html=True)
+                    <div style="background:#e2e8f0;border-radius:10px;height:6px;">
+                        <div style="background:#3b82f6;border-radius:10px;height:6px;
+                                    width:{progress}%;transition:width 0.3s;"></div>
+                    </div>
+                </div>
+                <div style="font-size:15px;font-weight:600;color:#1e293b;
+                            margin-bottom:22px;line-height:1.6;">{q['q']}</div>
+                """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)  # close card
 
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-                    if st.button("🔄 Ulangi Analisis", key="reset_mbti"):
-                        st.session_state.mbti_step   = 0
-                        st.session_state.mbti_resp   = []
-                        st.session_state.mbti_result = None
+                st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+                ba, bb = st.columns(2)
+                with ba:
+                    st.markdown('<div class="mbti-choice">', unsafe_allow_html=True)
+                    if st.button(f"A. {q['A']}", key=f"mbti_a_{step}", use_container_width=True):
+                        st.session_state.mbti_resp.append({"qid": q["id"], "ans": "A"})
+                        st.session_state.mbti_step += 1
+                        if st.session_state.mbti_step >= len(MBTI_Q):
+                            st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
+                            st.session_state.mbti = st.session_state.mbti_result
                         st.rerun()
-
-                elif step < len(MBTI_Q):
-                    q = MBTI_Q[step]
-                    progress = (step) / len(MBTI_Q)
-
-                    st.markdown(f"""
-                    <div style="margin-bottom:16px;">
-                        <div style="display:flex;justify-content:space-between;
-                                    font-size:12px;color:#94a3b8;margin-bottom:6px;">
-                            <span>Pertanyaan {step+1} dari {len(MBTI_Q)}</span>
-                            <span>{int(progress*100)}%</span>
-                        </div>
-                        <div style="background:#e2e8f0;border-radius:10px;height:6px;">
-                            <div style="background:#3b82f6;border-radius:10px;height:6px;
-                                        width:{int(progress*100)}%;transition:width 0.3s;"></div>
-                        </div>
-                    </div>
-                    <div style="font-size:15px;font-weight:600;color:#1e293b;
-                                margin-bottom:24px;line-height:1.6;">
-                        {q['q']}
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-                    btn_a, btn_b = st.columns(2)
-                    with btn_a:
-                        if st.button(f"A. {q['A']}", key=f"mbti_a_{step}", use_container_width=True):
-                            st.session_state.mbti_resp.append({"qid": q["id"], "ans": "A"})
-                            st.session_state.mbti_step += 1
-                            if st.session_state.mbti_step >= len(MBTI_Q):
-                                st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
-                                st.session_state.mbti = st.session_state.mbti_result
-                            st.rerun()
-                    with btn_b:
-                        if st.button(f"B. {q['B']}", key=f"mbti_b_{step}", use_container_width=True):
-                            st.session_state.mbti_resp.append({"qid": q["id"], "ans": "B"})
-                            st.session_state.mbti_step += 1
-                            if st.session_state.mbti_step >= len(MBTI_Q):
-                                st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
-                                st.session_state.mbti = st.session_state.mbti_result
-                            st.rerun()
-
-                    # Style MBTI buttons
-                    st.markdown("""
-                    <style>
-                    div[data-testid="stButton"] > button {
-                        background: #f0f4ff !important;
-                        color: #1e293b !important;
-                        border: 2px solid #e2e8f0 !important;
-                        border-radius: 14px !important;
-                        padding: 14px 16px !important;
-                        font-size: 13px !important;
-                        font-weight: 500 !important;
-                        text-align: left !important;
-                        height: auto !important;
-                        white-space: normal !important;
-                        line-height: 1.5 !important;
-                        transition: all 0.15s !important;
-                    }
-                    div[data-testid="stButton"] > button:hover {
-                        background: #3b82f6 !important;
-                        color: white !important;
-                        border-color: #3b82f6 !important;
-                    }
-                    </style>
-                    """, unsafe_allow_html=True)
-
-        # ── RIWAYAT ───────────────────────────────────────────────────────────
-        elif nav == 'riwayat':
-            st.markdown("""
-            <div style="background:white;border-radius:20px;padding:28px;
-                        box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-            <div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:20px;">
-                🕐 Riwayat Chat
-            </div>
-            """, unsafe_allow_html=True)
-            msgs = [m for m in st.session_state.messages if m['role']=='user']
-            if msgs:
-                for i, m in enumerate(msgs[-10:], 1):
-                    st.markdown(f"""
-                    <div style="padding:10px 14px;background:#f8fafc;border-radius:10px;
-                                margin-bottom:8px;font-size:13px;color:#334155;
-                                border-left:3px solid #3b82f6;">
-                        <b>#{i}</b> {m['content'][:80]}{'...' if len(m['content'])>80 else ''}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                with bb:
+                    st.markdown('<div class="mbti-choice">', unsafe_allow_html=True)
+                    if st.button(f"B. {q['B']}", key=f"mbti_b_{step}", use_container_width=True):
+                        st.session_state.mbti_resp.append({"qid": q["id"], "ans": "B"})
+                        st.session_state.mbti_step += 1
+                        if st.session_state.mbti_step >= len(MBTI_Q):
+                            st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
+                            st.session_state.mbti = st.session_state.mbti_result
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.markdown('<div style="color:#94a3b8;font-size:14px;">Belum ada riwayat chat.</div>', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── TENTANG ───────────────────────────────────────────────────────────
-        elif nav == 'tentang':
-            st.markdown("""
-            <div style="background:white;border-radius:20px;padding:28px;
-                        box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-            <div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:16px;">
-                ℹ️ Tentang PersonaTalk
-            </div>
-            <div style="font-size:14px;color:#475569;line-height:1.8;">
-                <b>PersonaTalk</b> adalah teman curhat AI yang dirancang untuk mendengarkan
-                tanpa menghakimi. Aplikasi ini menggunakan model ML untuk mendeteksi emosi
-                dan kepribadian MBTI dari percakapan, serta AI Groq (LLaMA 3.3 70B) untuk
-                menghasilkan respons yang hangat dan empatik.<br><br>
-                <b>Fitur:</b><br>
-                • 🎯 Deteksi emosi real-time<br>
-                • 🧠 Analisis kepribadian MBTI<br>
-                • 💬 Curhat dengan AI yang memahami konteks<br>
-                • 📊 Mood tracker harian
-            </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # ── SETELAN ───────────────────────────────────────────────────────────
-        elif nav == 'setelan':
-            st.markdown("""
-            <div style="background:white;border-radius:20px;padding:28px;
-                        box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-            <div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:20px;">
-                ⚙️ Setelan
-            </div>
-            """, unsafe_allow_html=True)
-
-            provider = st.session_state.get('_provider') or 'Belum aktif'
-            err      = st.session_state.get('_ai_err')
-            mbti_r   = st.session_state.get('mbti') or 'Belum dianalisis'
-
-            st.markdown(f"""
-            <div style="font-size:13px;color:#475569;">
-                <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
-                    <b>AI Provider:</b> {provider}
+    # ── RIWAYAT ───────────────────────────────────────────────────────────────
+    elif nav == 'riwayat':
+        st.markdown("""
+        <div style="background:white;border-radius:20px;padding:26px;
+                    box-shadow:0 8px 32px rgba(0,0,0,0.12);
+                    max-height:calc(100vh - 120px);overflow-y:auto;">
+        <div style="font-size:17px;font-weight:700;color:#1e293b;margin-bottom:18px;">
+            🕐 Riwayat Chat
+        </div>
+        """, unsafe_allow_html=True)
+        msgs = [m for m in st.session_state.messages if m['role']=='user']
+        if msgs:
+            for i, m in enumerate(msgs[-20:], 1):
+                st.markdown(f"""
+                <div style="padding:10px 14px;background:#f8fafc;border-radius:10px;
+                            margin-bottom:8px;font-size:13px;color:#334155;
+                            border-left:3px solid #3b82f6;">
+                    <span style="color:#94a3b8;font-size:11px;">#{i}</span>
+                    <span style="margin-left:8px;">{m['content'][:90]}{'...' if len(m['content'])>90 else ''}</span>
                 </div>
-                <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
-                    <b>MBTI Kamu:</b> {mbti_r}
-                </div>
-                <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
-                    <b>Total Pesan:</b> {len([m for m in st.session_state.messages if m['role']=='user'])}
-                </div>
-                {'<div style="padding:10px 0;color:#ef4444;"><b>Error:</b> '+err+'</div>' if err else ''}
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-            if st.button("🗑️ Reset Semua Chat", key="reset_chat"):
-                st.session_state.messages  = [{'role':'bot','content':'Halo, Talk Friend! 👋 Cerita apa aja, aku dengerin ya!'}]
-                st.session_state.emo_counts = {i:0 for i in range(6)}
-                st.session_state.last_bot   = []
-                st.session_state.mbti_texts = []
-                st.rerun()
-
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown('<div style="color:#94a3b8;font-size:14px;">Belum ada riwayat chat.</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── TENTANG ───────────────────────────────────────────────────────────────
+    elif nav == 'tentang':
+        st.markdown("""
+        <div style="background:white;border-radius:20px;padding:26px;
+                    box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+        <div style="font-size:17px;font-weight:700;color:#1e293b;margin-bottom:14px;">
+            ℹ️ Tentang PersonaTalk
+        </div>
+        <div style="font-size:14px;color:#475569;line-height:1.9;">
+            <b>PersonaTalk</b> adalah teman curhat AI yang dirancang untuk mendengarkan
+            tanpa menghakimi. Aplikasi ini menggunakan model ML untuk mendeteksi emosi
+            dan kepribadian MBTI dari percakapan, serta AI Groq (LLaMA 3.3 70B) untuk
+            menghasilkan respons yang hangat dan empatik.<br><br>
+            <b>Fitur:</b><br>
+            🎯 Deteksi emosi real-time<br>
+            🧠 Analisis kepribadian MBTI<br>
+            💬 Curhat dengan AI yang memahami konteks<br>
+            📊 Mood tracker harian
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── SETELAN ───────────────────────────────────────────────────────────────
+    elif nav == 'setelan':
+        provider = st.session_state.get('_provider') or 'Belum aktif'
+        err      = st.session_state.get('_ai_err')
+        mbti_r   = st.session_state.get('mbti') or 'Belum dianalisis'
+
+        st.markdown(f"""
+        <div style="background:white;border-radius:20px;padding:26px;
+                    box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+        <div style="font-size:17px;font-weight:700;color:#1e293b;margin-bottom:18px;">⚙️ Setelan</div>
+        <div style="font-size:13px;color:#475569;">
+            <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+                <b>AI Provider:</b> {provider}
+            </div>
+            <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+                <b>MBTI Kamu:</b> {mbti_r}
+            </div>
+            <div style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+                <b>Total Pesan:</b> {len([m for m in st.session_state.messages if m['role']=='user'])}
+            </div>
+            {'<div style="padding:10px 0;color:#ef4444;"><b>Error:</b> '+err+'</div>' if err else ''}
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
+        if st.button("🗑️ Reset Semua Chat", key="reset_chat"):
+            st.session_state.messages   = [{'role':'bot','content':'Halo, Talk Friend! 👋 Cerita apa aja, aku dengerin ya!'}]
+            st.session_state.emo_counts = {i:0 for i in range(6)}
+            st.session_state.last_bot   = []
+            st.session_state.mbti_texts = []
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close #pt-main
 
 
 if __name__ == "__main__":
