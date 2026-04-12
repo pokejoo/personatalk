@@ -1,5 +1,5 @@
 """
-🐼 PersonaTalk — Portfolio Style (FIXED COLORS)
+🐼 PersonaTalk — Portfolio Style (Groq Backend)
 """
 
 import streamlit as st
@@ -17,27 +17,17 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
 try:
-    import anthropic
-    _ANTHROPIC_OK = True
+    from groq import Groq
+    _GROQ_OK = True
 except ImportError:
-    _ANTHROPIC_OK = False
-
-try:
-    import google.generativeai as genai
-    _GENAI_OK = True
-except ImportError:
-    _GENAI_OK = False
+    _GROQ_OK = False
 
 from huggingface_hub import hf_hub_download
 
 # ── Config ────────────────────────────────────────────────────────────────────
-HF_REPO_ID    = "Jooou139/personatalk"
-ANTHROPIC_KEY = st.secrets.get("ANTHROPIC_API_KEY", "")
-GEMINI_KEY    = st.secrets.get("GEMINI_API_KEY", "")
-HF_TOKEN      = st.secrets.get("HF_TOKEN", "")
-
-if _GENAI_OK and GEMINI_KEY:
-    genai.configure(api_key=GEMINI_KEY)
+HF_REPO_ID = "Jooou139/personatalk"
+GROQ_KEY   = st.secrets.get("GROQ_API_KEY", "")
+HF_TOKEN   = st.secrets.get("HF_TOKEN", "")
 
 # ── Preprocessing ─────────────────────────────────────────────────────────────
 STOPWORDS_EN = set(stopwords.words('english'))
@@ -122,18 +112,6 @@ def predict_mbti(text, mm, mv, hist):
     return mm.predict(X)[0], float(mm.predict_proba(X)[0].max())
 
 # ── MBTI ──────────────────────────────────────────────────────────────────────
-MBTI_Q = [
-    {"id":1,"q":"Ketika menghadapi masalah besar, kamu lebih suka:","A":"Langsung cari solusi praktis","B":"Merenung dan mikirin berbagai kemungkinan","w":{"A":"S","B":"N"}},
-    {"id":2,"q":"Di waktu luang, kamu lebih menikmati:","A":"Kumpul dan sosialisasi sama banyak orang","B":"Waktu sendiri untuk recharge","w":{"A":"E","B":"I"}},
-    {"id":3,"q":"Saat ambil keputusan penting, kamu lebih andalkan:","A":"Logika dan analisis objektif","B":"Perasaan dan nilai-nilai pribadi","w":{"A":"T","B":"F"}},
-    {"id":4,"q":"Gaya hidupmu sehari-hari:","A":"Terstruktur dengan jadwal jelas","B":"Fleksibel dan ngikutin situasi","w":{"A":"J","B":"P"}},
-    {"id":5,"q":"Waktu belajar hal baru:","A":"Langsung praktek dan hands-on","B":"Baca teori dan pahami konsepnya dulu","w":{"A":"S","B":"N"}},
-    {"id":6,"q":"Di grup diskusi, biasanya kamu:","A":"Aktif dan sering mulai topik baru","B":"Lebih banyak dengerin, sesekali komentar","w":{"A":"E","B":"I"}},
-    {"id":7,"q":"Kalau teman curhat masalah, responsmu:","A":"Langsung kasih solusi praktis","B":"Dengerin dulu dan kasih dukungan emosional","w":{"A":"T","B":"F"}},
-    {"id":8,"q":"Menjelang deadline, kamu biasanya:","A":"Selesaikan jauh-jauh hari","B":"Paling produktif di menit-menit akhir","w":{"A":"J","B":"P"}},
-    {"id":9,"q":"Kamu lebih tertarik pada:","A":"Fakta, detail konkret, pengalaman nyata","B":"Pola, kemungkinan besar, gambaran besar","w":{"A":"S","B":"N"}},
-    {"id":10,"q":"Setelah seharian interaksi sosial, kamu:","A":"Makin semangat dan energized","B":"Capek dan butuh waktu sendiri","w":{"A":"E","B":"I"}},
-]
 MBTI_DESC = {
     "ISTJ":("The Logistician","Praktis, faktual, terorganisir — orang yang bisa diandalkan."),
     "ISFJ":("The Defender","Penyayang, hangat, selalu siap melindungi orang yang dicintai."),
@@ -152,29 +130,6 @@ MBTI_DESC = {
     "ENFJ":("The Protagonist","Karismatik, inspiratif, suka bimbing orang ke versi terbaiknya."),
     "ENTJ":("The Commander","Berwibawa, strategis, pemimpin alami yang penuh visi besar."),
 }
-DIM_EXP = {
-    "E":"Ekstrovert — energi dari interaksi sosial",
-    "I":"Introvert — energi dari waktu sendiri",
-    "S":"Sensing — fokus pada fakta & detail",
-    "N":"Intuition — fokus pada pola & kemungkinan",
-    "T":"Thinking — keputusan berdasarkan logika",
-    "F":"Feeling — keputusan berdasarkan nilai & perasaan",
-    "J":"Judging — suka struktur & perencanaan",
-    "P":"Perceiving — fleksibel & adaptif",
-}
-
-def analyze_mbti(responses):
-    sc = {k:0 for k in "EISNTFJP"}
-    for r in responses:
-        q = next((x for x in MBTI_Q if x["id"]==r["qid"]), None)
-        if q and r["ans"] in q["w"]: sc[q["w"][r["ans"]]] += 1
-    return (("E" if sc["E"]>=sc["I"] else "I") + ("S" if sc["S"]>=sc["N"] else "N") +
-            ("T" if sc["T"]>=sc["F"] else "F") + ("J" if sc["J"]>=sc["P"] else "P"))
-
-def fmt_mbti(t):
-    name, desc = MBTI_DESC.get(t, ("Unknown",""))
-    dims = "\n".join(f"  {d} → {DIM_EXP[d]}" for d in t if d in DIM_EXP)
-    return f"**{t} — {name}**\n\n{desc}\n\nDimensi kamu:\n{dims}"
 
 # ── System Prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """Kamu adalah PersonaTalk — teman curhat AI yang terasa seperti sahabat dekat, bukan chatbot generik atau terapis formal.
@@ -226,112 +181,91 @@ def is_dup(new: str, prev: list, thr=0.50) -> bool:
         if nf and of and len(nf) > 12 and nf == of: return True
     return False
 
-# ── Claude message builder ────────────────────────────────────────────────────
-def build_messages(history: list, emotion_id: int, last_resp: list) -> list:
-    emo_name  = EMO_LABEL.get(emotion_id, "Netral")
-    no_repeat = ""
-    if last_resp:
-        no_repeat = " | Jangan ulangi pola: " + " // ".join(r[:70] for r in last_resp[-2:])
-    msgs   = []
-    recent = history[-14:-1] if len(history) > 1 else []
-    for msg in recent:
-        role    = "assistant" if msg['role'] == 'bot' else "user"
-        content = msg['content']
-        if msgs and msgs[-1]['role'] == role:
-            msgs[-1]['content'] += "\n" + content
-        else:
-            msgs.append({'role': role, 'content': content})
-    hint = f"[Emosi user saat ini: {emo_name}{no_repeat}]"
-    if msgs and msgs[0]['role'] == 'user':
-        msgs[0]['content'] = hint + "\n" + msgs[0]['content']
-    else:
-        msgs.insert(0, {'role': 'user', 'content': hint})
-        if len(msgs) > 1 and msgs[1]['role'] != 'assistant':
-            msgs.insert(1, {'role': 'assistant', 'content': 'Oke, aku dengerin.'})
-    cur = history[-1]['content'] if history and history[-1]['role'] == 'user' else ""
-    if cur:
-        if msgs and msgs[-1]['role'] == 'user':
-            msgs[-1]['content'] += "\n" + cur
-        else:
-            msgs.append({'role': 'user', 'content': cur})
-    if not msgs or msgs[0]['role'] != 'user':
-        msgs.insert(0, {'role': 'user', 'content': hint})
-    return msgs
-
 def clean_text(text: str) -> str:
     text = re.sub(r'\[Emosi user.*?\]', '', text, flags=re.DOTALL)
     text = re.sub(r'##\s+', '', text)
     return text.strip()
 
-# ── AI Response ───────────────────────────────────────────────────────────────
+# ── Build Groq messages ───────────────────────────────────────────────────────
+def build_groq_messages(history: list, emotion_id: int, last_resp: list) -> list:
+    emo_name  = EMO_LABEL.get(emotion_id, "Netral")
+    no_repeat = ""
+    if last_resp:
+        no_repeat = " | Jangan ulangi pola: " + " // ".join(r[:70] for r in last_resp[-2:])
+
+    msgs  = [{"role": "system", "content": SYSTEM_PROMPT}]
+    recent = history[-14:-1] if len(history) > 1 else []
+    hint  = f"[Emosi user saat ini: {emo_name}{no_repeat}]"
+    first = True
+
+    for msg in recent:
+        role    = "assistant" if msg['role'] == 'bot' else "user"
+        content = msg['content']
+        if first and role == "user":
+            content = hint + "\n" + content
+            first = False
+        if msgs and msgs[-1]['role'] == role:
+            msgs[-1]['content'] += "\n" + content
+        else:
+            msgs.append({"role": role, "content": content})
+
+    cur = history[-1]['content'] if history and history[-1]['role'] == 'user' else ""
+    if cur:
+        if first:
+            cur = hint + "\n" + cur
+        if msgs and msgs[-1]['role'] == 'user':
+            msgs[-1]['content'] += "\n" + cur
+        else:
+            msgs.append({"role": "user", "content": cur})
+
+    if not msgs or msgs[-1]['role'] != 'user':
+        msgs.append({"role": "user", "content": hint})
+
+    return msgs
+
+# ── AI Response via Groq ──────────────────────────────────────────────────────
 def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: list):
     last_resp = last_resp or []
 
-    # ── Claude ────────────────────────────────────────────────────────────────
-    if _ANTHROPIC_OK and ANTHROPIC_KEY:
-        try:
-            client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-            msgs   = build_messages(history, emotion_id, last_resp)
-            out    = client.messages.create(
-                model="claude-sonnet-4-5",  # ✅ FIXED: nama model yang benar
-                max_tokens=400,
-                temperature=0.85,
-                system=SYSTEM_PROMPT,
-                messages=msgs,
-            )
-            text = clean_text(out.content[0].text)
-            if text and len(text) > 10:
-                if not is_dup(text, last_resp):
-                    st.session_state['_provider'] = 'claude'
-                    st.session_state['_ai_err']   = None
-                    return text
-                retry = client.messages.create(
-                    model="claude-sonnet-4-5",  # ✅ FIXED: nama model yang benar
-                    max_tokens=400,
-                    temperature=0.95,
-                    system=SYSTEM_PROMPT,
-                    messages=msgs + [
-                        {'role': 'assistant', 'content': text},
-                        {'role': 'user', 'content': 'Responmu terlalu mirip dengan sebelumnya. Gunakan pembuka yang berbeda sama sekali dan pertanyaan penutup yang beda topik.'},
-                    ],
-                )
-                text2 = clean_text(retry.content[0].text)
-                if text2 and len(text2) > 10:
-                    st.session_state['_provider'] = 'claude'
-                    st.session_state['_ai_err']   = None
-                    return text2
-        except Exception as e:
-            st.session_state['_ai_err'] = f"Claude: {str(e)[:120]}"
+    if not _GROQ_OK or not GROQ_KEY:
+        st.session_state['_ai_err'] = "Groq key tidak ditemukan atau library groq belum terinstall."
+        return None
 
-    # ── Gemini ────────────────────────────────────────────────────────────────
-    if _GENAI_OK and GEMINI_KEY:
-        emo_name = EMO_LABEL.get(emotion_id, "Netral")
-        recent   = history[-10:-1] if len(history) > 1 else []
-        ctx      = "\n".join(("User" if m['role']=='user' else "PersonaTalk")+": "+m['content'] for m in recent)
-        no_rep   = (" | JANGAN ulangi: " + " | ".join(r[:60] for r in last_resp[-2:])) if last_resp else ""
-        prompt   = f"Emosi user: {emo_name}{no_rep}\n\nRiwayat:\n{ctx}\n\nPesan user: \"{user_text}\"\n\nBalas sebagai PersonaTalk. 3-4 kalimat, natural, pembuka bervariasi."
-        try:
-            mdl = genai.GenerativeModel("gemini-2.0-flash")  # ✅ model Gemini tetap sama
-            r   = mdl.generate_content(
-                content=SYSTEM_PROMPT+"\n\n"+prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.85, top_p=0.95, max_output_tokens=400, top_k=40
-                ),
-                safety_settings=[
-                    {"category":"HARM_CATEGORY_HARASSMENT","threshold":"BLOCK_NONE"},
-                    {"category":"HARM_CATEGORY_HATE_SPEECH","threshold":"BLOCK_NONE"},
-                    {"category":"HARM_CATEGORY_SEXUALLY_EXPLICIT","threshold":"BLOCK_MEDIUM_AND_ABOVE"},
-                    {"category":"HARM_CATEGORY_DANGEROUS_CONTENT","threshold":"BLOCK_MEDIUM_AND_ABOVE"},
-                ],
-            )
-            text = clean_text(r.text)
-            if text and len(text) > 10 and not is_dup(text, last_resp):
-                st.session_state['_provider'] = 'gemini'
+    try:
+        client = Groq(api_key=GROQ_KEY)
+        msgs   = build_groq_messages(history, emotion_id, last_resp)
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=msgs,
+            max_tokens=400,
+            temperature=0.85,
+        )
+        text = clean_text(response.choices[0].message.content)
+
+        if text and len(text) > 10:
+            if not is_dup(text, last_resp):
+                st.session_state['_provider'] = 'groq'
                 st.session_state['_ai_err']   = None
                 return text
-        except Exception as e:
-            prev = st.session_state.get('_ai_err','')
-            st.session_state['_ai_err'] = (prev+" | " if prev else "") + f"Gemini: {str(e)[:100]}"
+
+            # retry anti-duplikat
+            msgs.append({"role": "assistant", "content": text})
+            msgs.append({"role": "user", "content": "Responmu terlalu mirip dengan sebelumnya. Gunakan pembuka yang berbeda sama sekali dan pertanyaan penutup yang beda topik."})
+            retry = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=msgs,
+                max_tokens=400,
+                temperature=0.95,
+            )
+            text2 = clean_text(retry.choices[0].message.content)
+            if text2 and len(text2) > 10:
+                st.session_state['_provider'] = 'groq'
+                st.session_state['_ai_err']   = None
+                return text2
+
+    except Exception as e:
+        st.session_state['_ai_err'] = f"Groq error: {str(e)[:150]}"
 
     return None
 
@@ -340,24 +274,45 @@ def fallback_response(text: str, emotion: int, history: list) -> str:
     t  = text.lower()
     fc = ' '.join(m['content'].lower() for m in (history or [])[-5:] if m['role']=='user')
     for kws, opts in {
-        ('putus','diputus','ditinggal'): ["Duh, berasa ada yang ilang tiba-tiba ya. Kamu lagi sendirian atau ada yang temani?","Aduh, ini pasti menyakitkan. Udah cerita ke orang terdekat belum?"],
-        ('selingkuh','diselingkuhin','dikhianatin'): ["Oof, diselingkuhin itu rasa sakitnya berlapis. Dia udah tahu ketahuan?","Ya Allah, dikhianatin sama orang yang dipercaya itu beda levelnya. Kamu lagi gimana?"],
-        ('bingung','blank','lost'): ["Hmm, blank kayak gini biasanya karena terlalu banyak yang dipikirin. Paling bikin stuck soal apa?","Ngerasa lost itu berat. Kamu butuh didengar atau butuh arah konkret?"],
-        ('rindu','kangen'): ["Kangen yang dalam kayak gini nyesek banget. Kamu kangen orangnya, momennya, atau keduanya?","Ooh, rindu kayak gini biasanya tanda ada hal penting yang kamu miss. Udah berapa lama?"],
-        ('capek','lelah','burnout'): ["Capek yang kayak gini beda — bukan cuma fisik. Dari kerjaan, hubungan, atau semua sekaligus?","Aduh, burnout kayak gini nyata dan berat. Kamu kapan terakhir beneran istirahat?"],
-        ('cemas','khawatir','overthinking','gelisah','stress'): ["Gelisah kayak gini nggak enak. Ini overthinking atau ada hal konkret yang bikin khawatir?","Cemas yang dalam kayak gini biasanya ada trigger-nya. Soal apa yang paling bikin was-was?"],
-        ('crush','naksir','gebetan','cantik','ganteng'): ["Ooh, ada yang spesial nih! Dia udah tau kamu naksir?","Wah, ada yang bikin deg-degan! Gimana interaksi kalian sejauh ini?"],
+        ('putus','diputus','ditinggal'): [
+            "Duh, berasa ada yang ilang tiba-tiba ya. Kamu lagi sendirian atau ada yang temani?",
+            "Aduh, ini pasti menyakitkan. Udah cerita ke orang terdekat belum?",
+        ],
+        ('selingkuh','diselingkuhin','dikhianatin'): [
+            "Oof, diselingkuhin itu rasa sakitnya berlapis. Dia udah tahu ketahuan?",
+            "Ya Allah, dikhianatin sama orang yang dipercaya itu beda levelnya. Kamu lagi gimana?",
+        ],
+        ('bingung','blank','lost'): [
+            "Hmm, blank kayak gini biasanya karena terlalu banyak yang dipikirin. Paling bikin stuck soal apa?",
+            "Ngerasa lost itu berat. Kamu butuh didengar atau butuh arah konkret?",
+        ],
+        ('rindu','kangen'): [
+            "Kangen yang dalam kayak gini nyesek banget. Kamu kangen orangnya, momennya, atau keduanya?",
+            "Ooh, rindu kayak gini biasanya tanda ada hal penting yang kamu miss. Udah berapa lama?",
+        ],
+        ('capek','lelah','burnout'): [
+            "Capek yang kayak gini beda — bukan cuma fisik. Dari kerjaan, hubungan, atau semua sekaligus?",
+            "Aduh, burnout kayak gini nyata dan berat. Kamu kapan terakhir beneran istirahat?",
+        ],
+        ('cemas','khawatir','overthinking','gelisah','stress'): [
+            "Gelisah kayak gini nggak enak. Ini overthinking atau ada hal konkret yang bikin khawatir?",
+            "Cemas yang dalam kayak gini biasanya ada trigger-nya. Soal apa yang paling bikin was-was?",
+        ],
+        ('crush','naksir','gebetan','cantik','ganteng'): [
+            "Ooh, ada yang spesial nih! Dia udah tau kamu naksir?",
+            "Wah, ada yang bikin deg-degan! Gimana interaksi kalian sejauh ini?",
+        ],
     }.items():
         if any(k in fc or k in t for k in kws):
             return random.choice(opts)
     return random.choice({
-        1: ["Wah, kedengarannya ada yang bagus nih! Apaan sih yang terjadi?","Ooh, excited banget dengernya! Cerita dong dari awal."],
-        2: ["Ooh, ada yang spesial nih! Gimana dia?","Wah, ada yang bikin deg-degan! Cerita lebih dong."],
-        3: ["Kemarahan kayak gini valid banget. Ini marah sama orangnya atau situasinya?","Oof, emosi banget nih. Apaan yang paling bikin gemas?"],
-        4: ["Gelisah kayak gini nggak enak. Ini soal apa yang paling bikin khawatir?","Cemas yang dalam kayak gini berat. Udah berapa lama ngerasa gini?"],
-        0: ["Duh, kedengarannya berat. Mau cerita lebih? Aku dengerin.","Aduh, ada yang lagi berat dipikul. Dari mana mau mulai ceritanya?"],
-        5: ["Serius?! Apaan yang bikin kaget banget?","Astaga, unexpected banget! Gimana ceritanya?"],
-    }.get(emotion, ["Hmm, ada apa yang lagi kamu pikirin? Cerita yuk.","Duh, kedengarannya ada sesuatu. Aku di sini kok."]))
+        1: ["Wah, kedengarannya ada yang bagus nih! Apaan sih yang terjadi?", "Ooh, excited banget dengernya! Cerita dong dari awal."],
+        2: ["Ooh, ada yang spesial nih! Gimana dia?", "Wah, ada yang bikin deg-degan! Cerita lebih dong."],
+        3: ["Kemarahan kayak gini valid banget. Ini marah sama orangnya atau situasinya?", "Oof, emosi banget nih. Apaan yang paling bikin gemas?"],
+        4: ["Gelisah kayak gini nggak enak. Ini soal apa yang paling bikin khawatir?", "Cemas yang dalam kayak gini berat. Udah berapa lama ngerasa gini?"],
+        0: ["Duh, kedengarannya berat. Mau cerita lebih? Aku dengerin.", "Aduh, ada yang lagi berat dipikul. Dari mana mau mulai ceritanya?"],
+        5: ["Serius?! Apaan yang bikin kaget banget?", "Astaga, unexpected banget! Gimana ceritanya?"],
+    }.get(emotion, ["Hmm, ada apa yang lagi kamu pikirin? Cerita yuk.", "Duh, kedengarannya ada sesuatu. Aku di sini kok."]))
 
 # ── Mood Donut ────────────────────────────────────────────────────────────────
 def mood_donut_html(emo_counts: dict) -> str:
@@ -372,6 +327,7 @@ def mood_donut_html(emo_counts: dict) -> str:
     r, cx, cy  = 38, 50, 50
     inner_r    = 24
     paths, off = "", 0.0
+
     for i, pct in enumerate(pcts):
         if pct < 0.005:
             off += pct
@@ -418,155 +374,59 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</div>'
     )
 
-# ── CSS Portfolio Style ───────────────────────────────────────────────────────
+# ── CSS ───────────────────────────────────────────────────────────────────────
 def inject_css():
     st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif !important;
-    color: #1e293b !important;
-}
+html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; color: #1e293b !important; }
+.stApp { background: #f8fafc !important; }
+.main > div { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem; }
+#MainMenu, footer, header { visibility: hidden !important; }
+[data-testid="stToolbar"] { display: none !important; }
 
-.stApp {
-    background: #f8fafc !important;
-}
-
-.main > div {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 1rem 2rem;
-}
-
-#MainMenu, footer, header {
-    visibility: hidden !important;
-}
-[data-testid="stToolbar"] {
-    display: none !important;
-}
-
-.hero-title {
-    font-size: 3rem;
-    font-weight: 800;
-    color: #0f172a !important;
-    margin-bottom: 0.5rem;
-}
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: #475569 !important;
-    margin-bottom: 1.5rem;
-}
+.hero-title { font-size: 3rem; font-weight: 800; color: #0f172a !important; margin-bottom: 0.5rem; }
+.hero-subtitle { font-size: 1.1rem; color: #475569 !important; margin-bottom: 1.5rem; }
 
 .skill-card {
-    background: white;
-    border-radius: 16px;
-    padding: 1rem 1.2rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    transition: all 0.2s ease;
+    background: white; border-radius: 16px; padding: 1rem 1.2rem;
+    border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: all 0.2s ease;
 }
-.skill-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-    border-color: #cbd5e1;
-}
-.skill-card div {
-    color: #1e293b !important;
-}
+.skill-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #cbd5e1; }
+.skill-card div { color: #1e293b !important; }
 
-section[data-testid="stSidebar"] {
-    background: #ffffff !important;
-    border-right: 1px solid #e2e8f0 !important;
-}
+section[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #e2e8f0 !important; }
 section[data-testid="stSidebar"] p,
 section[data-testid="stSidebar"] span,
 section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] .stMarkdown {
-    color: #334155 !important;
-}
+section[data-testid="stSidebar"] .stMarkdown { color: #334155 !important; }
 
 [data-testid="stChatMessage"] {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 16px !important;
-    padding: 12px 16px !important;
-    margin-bottom: 12px !important;
+    background: white !important; border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important; padding: 12px 16px !important; margin-bottom: 12px !important;
 }
 [data-testid="stChatMessage"] p,
 [data-testid="stChatMessage"] span,
-[data-testid="stChatMessage"] div {
-    color: #1e293b !important;
-}
+[data-testid="stChatMessage"] div { color: #1e293b !important; }
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) { background: #eff6ff !important; border-color: #dbeafe !important; }
 
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: #eff6ff !important;
-    border-color: #dbeafe !important;
-}
+[data-testid="stChatInput"] textarea { background: white !important; border: 1px solid #e2e8f0 !important; border-radius: 24px !important; color: #1e293b !important; }
+[data-testid="stChatInput"] textarea::placeholder { color: #94a3b8 !important; }
+[data-testid="stChatInputSubmitButton"] button { background: #3b82f6 !important; border-radius: 50% !important; color: white !important; }
 
-[data-testid="stChatInput"] textarea {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 24px !important;
-    color: #1e293b !important;
-}
-[data-testid="stChatInput"] textarea::placeholder {
-    color: #94a3b8 !important;
-}
-[data-testid="stChatInputSubmitButton"] button {
-    background: #3b82f6 !important;
-    border-radius: 50% !important;
-    color: white !important;
-}
+[data-testid="stMetric"] { background: white !important; border-radius: 14px !important; padding: 12px 14px !important; border: 1px solid #e2e8f0 !important; }
+[data-testid="stMetricValue"] { color: #0f172a !important; }
+[data-testid="stMetricLabel"] { color: #64748b !important; }
 
-[data-testid="stMetric"] {
-    background: white !important;
-    border-radius: 14px !important;
-    padding: 12px 14px !important;
-    border: 1px solid #e2e8f0 !important;
-}
-[data-testid="stMetricValue"] {
-    color: #0f172a !important;
-}
-[data-testid="stMetricLabel"] {
-    color: #64748b !important;
-}
-
-.stButton > button {
-    background: #3b82f6 !important;
-    border: none !important;
-    border-radius: 40px !important;
-    color: white !important;
-    font-weight: 500 !important;
-}
-
-.stAlert {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
-}
-.stAlert p {
-    color: #1e293b !important;
-}
-
-h1, h2, h3, h4, h5, h6 {
-    color: #0f172a !important;
-}
-
-p, li, div {
-    color: #334155 !important;
-}
-
-hr {
-    border-color: #e2e8f0 !important;
-}
-
-::-webkit-scrollbar {
-    width: 4px;
-}
-::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-}
+.stButton > button { background: #3b82f6 !important; border: none !important; border-radius: 40px !important; color: white !important; font-weight: 500 !important; }
+.stAlert { background: white !important; border: 1px solid #e2e8f0 !important; }
+.stAlert p { color: #1e293b !important; }
+h1, h2, h3, h4, h5, h6 { color: #0f172a !important; }
+p, li, div { color: #334155 !important; }
+hr { border-color: #e2e8f0 !important; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -583,13 +443,11 @@ def main():
     with st.spinner("Memuat PersonaTalk..."):
         emo_model, emo_vec, mbti_model, mbti_vec = load_models()
 
-    # Session defaults
     for k, v in {
-        'messages':   [{'role':'bot','content':'Halo! 👋 Aku PersonaTalk, teman curhat kamu.\n\nCerita apa aja, aku dengerin.'}],
-        'emotion':    1, 'confidence': 0.5, 'mbti': None, 'mbti_texts': [],
-        'mode':       'curhat', 'q_idx': -1, 'q_resp': [],
-        'last_bot':   [], 'emo_counts': {i:0 for i in range(6)},
-        '_provider':  None, '_ai_err': None,
+        'messages':  [{'role':'bot','content':'Halo! 👋 Aku PersonaTalk, teman curhat kamu.\n\nCerita apa aja, aku dengerin.'}],
+        'emotion':   1, 'confidence': 0.5, 'mbti': None, 'mbti_texts': [],
+        'last_bot':  [], 'emo_counts': {i:0 for i in range(6)},
+        '_provider': None, '_ai_err': None,
     }.items():
         if k not in st.session_state:
             st.session_state[k] = v
@@ -607,31 +465,25 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown("---")
-
         st.markdown("### 📊 Mood Analytics")
         st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
-
         st.markdown("---")
         if st.session_state.mbti:
             st.markdown(f"**🧬 MBTI:** `{st.session_state.mbti}`")
-
         st.markdown("---")
-        status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
+        status = '🟢 Groq Active' if st.session_state['_provider'] == 'groq' else '⚪ Ready'
         st.caption(f"AI Status: {status}")
 
-        # ── Debug info (hapus setelah confirmed working) ──────────────────────
         with st.expander("🔧 Debug Info"):
-            st.write("Claude key:", bool(ANTHROPIC_KEY))
-            st.write("Gemini key:", bool(GEMINI_KEY))
-            st.write("anthropic lib:", _ANTHROPIC_OK)
-            st.write("genai lib:", _GENAI_OK)
+            st.write("Groq key:", bool(GROQ_KEY))
+            st.write("groq lib:", _GROQ_OK)
             err = st.session_state.get('_ai_err')
             if err:
                 st.error(f"Error: {err}")
             else:
                 st.success("No errors")
 
-    # ── MAIN CONTENT ─────────────────────────────────────────────────────────
+    # ── Main Content ──────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
 
     with col1:
@@ -676,7 +528,6 @@ def main():
     st.markdown("---")
     st.markdown("### 💬 Chat with PersonaTalk")
 
-    # Display chat messages
     for msg in st.session_state.messages:
         if msg['role'] == 'user':
             with st.chat_message("user", avatar="👤"):
@@ -685,7 +536,6 @@ def main():
             with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
                 st.write(msg['content'])
 
-    # Chat input
     user_text = st.chat_input("Ketik pesan...")
 
     if user_text and user_text.strip():
@@ -693,7 +543,7 @@ def main():
         st.session_state.messages.append({'role': 'user', 'content': user_text})
 
         emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
-        st.session_state.emotion = emo_id
+        st.session_state.emotion    = emo_id
         st.session_state.confidence = conf
         st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
 
