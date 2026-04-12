@@ -266,13 +266,18 @@ def clean_text(text: str) -> str:
 # ── AI Response ───────────────────────────────────────────────────────────────
 def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: list):
     last_resp = last_resp or []
+
+    # ── Claude ────────────────────────────────────────────────────────────────
     if _ANTHROPIC_OK and ANTHROPIC_KEY:
         try:
             client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
             msgs   = build_messages(history, emotion_id, last_resp)
             out    = client.messages.create(
-                model="claude-sonnet-4-6", max_tokens=400,
-                temperature=0.85, system=SYSTEM_PROMPT, messages=msgs,
+                model="claude-sonnet-4-5",  # ✅ FIXED: nama model yang benar
+                max_tokens=400,
+                temperature=0.85,
+                system=SYSTEM_PROMPT,
+                messages=msgs,
             )
             text = clean_text(out.content[0].text)
             if text and len(text) > 10:
@@ -281,7 +286,9 @@ def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: l
                     st.session_state['_ai_err']   = None
                     return text
                 retry = client.messages.create(
-                    model="claude-sonnet-4-6", max_tokens=400, temperature=0.95,
+                    model="claude-sonnet-4-5",  # ✅ FIXED: nama model yang benar
+                    max_tokens=400,
+                    temperature=0.95,
                     system=SYSTEM_PROMPT,
                     messages=msgs + [
                         {'role': 'assistant', 'content': text},
@@ -296,6 +303,7 @@ def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: l
         except Exception as e:
             st.session_state['_ai_err'] = f"Claude: {str(e)[:120]}"
 
+    # ── Gemini ────────────────────────────────────────────────────────────────
     if _GENAI_OK and GEMINI_KEY:
         emo_name = EMO_LABEL.get(emotion_id, "Netral")
         recent   = history[-10:-1] if len(history) > 1 else []
@@ -303,10 +311,12 @@ def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: l
         no_rep   = (" | JANGAN ulangi: " + " | ".join(r[:60] for r in last_resp[-2:])) if last_resp else ""
         prompt   = f"Emosi user: {emo_name}{no_rep}\n\nRiwayat:\n{ctx}\n\nPesan user: \"{user_text}\"\n\nBalas sebagai PersonaTalk. 3-4 kalimat, natural, pembuka bervariasi."
         try:
-            mdl = genai.GenerativeModel("gemini-2.0-flash")
+            mdl = genai.GenerativeModel("gemini-2.0-flash")  # ✅ model Gemini tetap sama
             r   = mdl.generate_content(
                 content=SYSTEM_PROMPT+"\n\n"+prompt,
-                generation_config=genai.types.GenerationConfig(temperature=0.85, top_p=0.95, max_output_tokens=400, top_k=40),
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.85, top_p=0.95, max_output_tokens=400, top_k=40
+                ),
                 safety_settings=[
                     {"category":"HARM_CATEGORY_HARASSMENT","threshold":"BLOCK_NONE"},
                     {"category":"HARM_CATEGORY_HATE_SPEECH","threshold":"BLOCK_NONE"},
@@ -322,6 +332,7 @@ def get_ai_response(user_text: str, emotion_id: int, history: list, last_resp: l
         except Exception as e:
             prev = st.session_state.get('_ai_err','')
             st.session_state['_ai_err'] = (prev+" | " if prev else "") + f"Gemini: {str(e)[:100]}"
+
     return None
 
 # ── Smart Fallback ────────────────────────────────────────────────────────────
@@ -407,7 +418,7 @@ def mood_donut_html(emo_counts: dict) -> str:
         f'</div>'
     )
 
-# ── CSS Portfolio Style — FIXED (semua teks gelap) ───────────────────────────
+# ── CSS Portfolio Style ───────────────────────────────────────────────────────
 def inject_css():
     st.markdown("""
 <style>
@@ -418,19 +429,16 @@ html, body, [class*="css"] {
     color: #1e293b !important;
 }
 
-/* Background putih bersih */
 .stApp {
     background: #f8fafc !important;
 }
 
-/* Main container */
 .main > div {
     max-width: 1200px;
     margin: 0 auto;
     padding: 1rem 2rem;
 }
 
-/* Hide default Streamlit elements */
 #MainMenu, footer, header {
     visibility: hidden !important;
 }
@@ -438,7 +446,6 @@ html, body, [class*="css"] {
     display: none !important;
 }
 
-/* Hero title — dark text */
 .hero-title {
     font-size: 3rem;
     font-weight: 800;
@@ -451,7 +458,6 @@ html, body, [class*="css"] {
     margin-bottom: 1.5rem;
 }
 
-/* Skill cards */
 .skill-card {
     background: white;
     border-radius: 16px;
@@ -469,7 +475,6 @@ html, body, [class*="css"] {
     color: #1e293b !important;
 }
 
-/* Sidebar styling */
 section[data-testid="stSidebar"] {
     background: #ffffff !important;
     border-right: 1px solid #e2e8f0 !important;
@@ -481,7 +486,6 @@ section[data-testid="stSidebar"] .stMarkdown {
     color: #334155 !important;
 }
 
-/* Chat messages */
 [data-testid="stChatMessage"] {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
@@ -495,13 +499,11 @@ section[data-testid="stSidebar"] .stMarkdown {
     color: #1e293b !important;
 }
 
-/* User message — blue tint */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
     background: #eff6ff !important;
     border-color: #dbeafe !important;
 }
 
-/* Chat input */
 [data-testid="stChatInput"] textarea {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
@@ -517,7 +519,6 @@ section[data-testid="stSidebar"] .stMarkdown {
     color: white !important;
 }
 
-/* Metric cards */
 [data-testid="stMetric"] {
     background: white !important;
     border-radius: 14px !important;
@@ -531,7 +532,6 @@ section[data-testid="stSidebar"] .stMarkdown {
     color: #64748b !important;
 }
 
-/* Buttons */
 .stButton > button {
     background: #3b82f6 !important;
     border: none !important;
@@ -540,7 +540,6 @@ section[data-testid="stSidebar"] .stMarkdown {
     font-weight: 500 !important;
 }
 
-/* Info/warning boxes */
 .stAlert {
     background: white !important;
     border: 1px solid #e2e8f0 !important;
@@ -549,22 +548,18 @@ section[data-testid="stSidebar"] .stMarkdown {
     color: #1e293b !important;
 }
 
-/* Headers */
 h1, h2, h3, h4, h5, h6 {
     color: #0f172a !important;
 }
 
-/* Text */
 p, li, div {
     color: #334155 !important;
 }
 
-/* Divider */
 hr {
     border-color: #e2e8f0 !important;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
     width: 4px;
 }
@@ -612,37 +607,44 @@ def main():
             unsafe_allow_html=True,
         )
         st.markdown("---")
-        
-        # Mood analytics
+
         st.markdown("### 📊 Mood Analytics")
         st.markdown(mood_donut_html(st.session_state.emo_counts), unsafe_allow_html=True)
-        
+
         st.markdown("---")
         if st.session_state.mbti:
             st.markdown(f"**🧬 MBTI:** `{st.session_state.mbti}`")
-        
+
         st.markdown("---")
         status = '🟢 Active' if st.session_state['_provider'] else '⚪ Ready'
         st.caption(f"AI Status: {status}")
 
-        st.write("Claude key:", bool(ANTHROPIC_KEY))
-        st.write("Gemini key:", bool(GEMINI_KEY))
-        st.write("Error:", st.session_state.get('_ai_err'))
+        # ── Debug info (hapus setelah confirmed working) ──────────────────────
+        with st.expander("🔧 Debug Info"):
+            st.write("Claude key:", bool(ANTHROPIC_KEY))
+            st.write("Gemini key:", bool(GEMINI_KEY))
+            st.write("anthropic lib:", _ANTHROPIC_OK)
+            st.write("genai lib:", _GENAI_OK)
+            err = st.session_state.get('_ai_err')
+            if err:
+                st.error(f"Error: {err}")
+            else:
+                st.success("No errors")
 
     # ── MAIN CONTENT ─────────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         st.markdown('<div class="hero-title">Hi, I\'m PersonaTalk</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">Your AI friend who listens without judgment. 💙</div>', unsafe_allow_html=True)
-        
+
         st.markdown("### About Me")
         st.markdown("""
         PersonaTalk is designed to be a genuine companion — not a therapist, not a bot, 
         but a friend who's always there to listen. Whether you're happy, sad, confused, 
         or just need someone to talk to, I'm here.
         """)
-        
+
         st.markdown("### What I Can Do")
         cols = st.columns(3)
         features = [
@@ -659,7 +661,7 @@ def main():
                     <div style="font-size:12px;color:#64748b;">{desc}</div>
                 </div>
                 """, unsafe_allow_html=True)
-        
+
         st.markdown("### Current Mood")
         emo_label = EMO_LABEL.get(emo_id, 'Netral')
         emo_emoji = EMO_EMOJI.get(emo_id, '😊')
@@ -673,7 +675,7 @@ def main():
 
     st.markdown("---")
     st.markdown("### 💬 Chat with PersonaTalk")
-    
+
     # Display chat messages
     for msg in st.session_state.messages:
         if msg['role'] == 'user':
@@ -682,27 +684,27 @@ def main():
         else:
             with st.chat_message("assistant", avatar=EMO_ICON.get(emo_id, '🐼')):
                 st.write(msg['content'])
-    
+
     # Chat input
     user_text = st.chat_input("Ketik pesan...")
-    
+
     if user_text and user_text.strip():
         user_text = user_text.strip()
         st.session_state.messages.append({'role': 'user', 'content': user_text})
-        
+
         emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
         st.session_state.emotion = emo_id
         st.session_state.confidence = conf
         st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id, 0) + 1
-        
+
         mbti_p, mbti_c = predict_mbti(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
         if mbti_p and mbti_c > 0.3:
             st.session_state.mbti = mbti_p
-        
+
         response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
         if not response:
             response = fallback_response(user_text, emo_id, st.session_state.messages)
-        
+
         st.session_state.last_bot.append(response)
         st.session_state.messages.append({'role': 'bot', 'content': response})
         st.rerun()
