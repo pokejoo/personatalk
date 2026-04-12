@@ -1,17 +1,12 @@
 """
-🐼 PersonaTalk v3
-- Chat bubbles rendered INSIDE white card (one HTML string)
-- Dark sidebar (native st.sidebar) with smooth Streamlit toggle
-- Sidebar: mode switch (Curhat / MBTI), mood panel, MBTI badge
-- Models loaded from HuggingFace
+PersonaTalk — UI dari referensi + HuggingFace models (Jooou139/personatalk)
 """
 
 import streamlit as st
 import numpy as np
 import re
+import os
 import random
-import math
-import joblib
 
 import nltk
 nltk.download('stopwords', quiet=True)
@@ -20,13 +15,16 @@ nltk.download('omw-1.4',  quiet=True)
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 
+import joblib
+from huggingface_hub import hf_hub_download
+
+import plotly.graph_objects as go
+
 try:
     from groq import Groq
     _GROQ_OK = True
 except ImportError:
     _GROQ_OK = False
-
-from huggingface_hub import hf_hub_download
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 HF_REPO_ID = "Jooou139/personatalk"
@@ -43,7 +41,7 @@ def preprocess(text: str) -> str:
     return ' '.join(lemmatizer.lemmatize(w) for w in text.split()
                     if w not in STOPWORDS_EN and len(w) > 2)
 
-# ── Load Models ────────────────────────────────────────────────────────────────
+# ── Load Models dari HuggingFace ───────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def load_models():
     try:
@@ -58,154 +56,163 @@ def load_models():
         st.stop()
 
 # ── Emotion ────────────────────────────────────────────────────────────────────
-EMO_LABEL = {0:'Sedih', 1:'Bahagia', 2:'Cinta', 3:'Marah', 4:'Gelisah', 5:'Terkejut'}
-EMO_EMOJI = {0:'😔', 1:'😊', 2:'❤️',  3:'😠', 4:'😨', 5:'😲'}
-EMO_COLOR = {0:'#5b8dd9', 1:'#f59f00', 2:'#e64980', 3:'#f03e3e', 4:'#7950f2', 5:'#2ecc71'}
+emotion_labels = {0:'Sedih', 1:'Bahagia', 2:'Cinta', 3:'Marah', 4:'Takut', 5:'Terkejut'}
+mood_icons     = {0:'😔', 1:'😊', 2:'❤️', 3:'😠', 4:'😨', 5:'😲'}
 
-LEXICON = {
-    'sedih':0,'kecewa':0,'galau':0,'nangis':0,'sepi':0,'kesepian':0,'putus':0,
-    'ditinggal':0,'kehilangan':0,'patah hati':0,'down':0,'murung':0,'hampa':0,
-    'nyesel':0,'frustasi':0,'hopeless':0,'bingung':0,'sendirian':0,
-    'marah':3,'kesal':3,'benci':3,'jengkel':3,'emosi':3,'kesel':3,'sebel':3,
-    'muak':3,'tersinggung':3,'dibohongi':3,'ditipu':3,
-    'senang':1,'bahagia':1,'happy':1,'excited':1,'lega':1,'bangga':1,'semangat':1,
-    'alhamdulillah':1,'syukur':1,'gembira':1,
-    'takut':4,'cemas':4,'khawatir':4,'panik':4,'nervous':4,'gelisah':4,'stress':4,
-    'anxious':4,'anxiety':4,'overthinking':4,'was-was':4,'resah':4,
-    'cinta':2,'sayang':2,'rindu':2,'kangen':2,'suka':2,'naksir':2,
-    'kaget':5,'shock':5,'terkejut':5,'astaga':5,
+emotion_lexicon = {
+    "sedih":0,"kecewa":0,"patah hati":0,"galau":0,"murung":0,"terpukul":0,
+    "hancur":0,"terluka":0,"down":0,"nangis":0,"menangis":0,"ditinggal":0,
+    "diputus":0,"putus":0,"kehilangan":0,"sepi":0,"kesepian":0,"bingung":0,
+    "sendirian":0,"hampa":0,"kosong":0,"hopeless":0,"nyesel":0,"frustasi":0,
+    "sakit hati":0,"dikhianati":0,"selingkuh":0,"diselingkuhi":0,
+    "marah":3,"kesal":3,"sebal":3,"benci":3,"jengkel":3,"emosi":3,"kesel":3,
+    "muak":3,"tersinggung":3,"dibohongi":3,"ditipu":3,"nggak adil":3,"gak adil":3,
+    "senang":1,"bahagia":1,"gembira":1,"happy":1,"lega":1,"bangga":1,"excited":1,
+    "alhamdulillah":1,"syukur":1,"semangat":1,"berhasil":1,"sukses":1,
+    "takut":4,"cemas":4,"khawatir":4,"panik":4,"gelisah":4,"nervous":4,
+    "overthinking":4,"anxiety":4,"anxious":4,"was-was":4,"stress":4,"resah":4,
+    "cinta":2,"sayang":2,"suka":2,"jatuh cinta":2,"kangen":2,"rindu":2,"naksir":2,
+    "kaget":5,"terkejut":5,"shock":5,"astaga":5,"ga nyangka":5,"nggak nyangka":5,
 }
 
-def rule_emotion(text: str):
+def rule_based_emotion(text: str):
     t = text.lower()
-    for phrase, emo in [
-        ('patah hati',0),('putus sama',0),('diselingkuhin',0),('dikhianatin',0),
-        ('sakit hati',0),('ditinggal pergi',0),
-        ('overthinking',4),('deg degan',4),('was-was',4),('ga tenang',4),
-        ('nggak tenang',4),('khawatir banget',4),
-        ('seneng banget',1),('alhamdulillah',1),('lega banget',1),
-        ('jatuh cinta',2),('pdkt',2),('naksir',2),
-        ('marah banget',3),('kesel banget',3),('nggak adil',3),
-        ('kaget banget',5),('ga nyangka',5),('nggak nyangka',5),
-    ]:
-        if phrase in t: return emo
-    for emo, kws in {
-        0:['sedih','nangis','down','putus','ditinggal','sepi','galau','hampa','nyesel'],
-        1:['bahagia','senang','happy','gembira','excited','lega','bangga','yay'],
-        2:['cinta','sayang','rindu','kangen','naksir','gebetan'],
-        3:['marah','kesal','benci','emosi','jengkel','muak'],
-        4:['takut','cemas','khawatir','panik','nervous','gelisah','stress'],
-        5:['kaget','shock','terkejut','astaga'],
-    }.items():
+    phrase_rules = {
+        0: ["patah hati","putus sama","diselingkuhin","dikhianatin","sakit hati",
+            "ditinggal pergi","capek banget","lelah banget","bingung banget",
+            "ga tau harus","nggak tau harus","hilang arah","ga semangat"],
+        3: ["nggak adil","gak adil","dibohongin","ditipu","dimanfaatin"],
+        4: ["overthinking","was-was","nggak tenang","ga tenang","takut banget",
+            "khawatir banget","deg degan","nggak yakin","ga yakin"],
+        1: ["seneng banget","happy banget","lega banget","alhamdulillah","bangga banget"],
+    }
+    for emo, phrases in phrase_rules.items():
+        if any(ph in t for ph in phrases): return emo
+    rules = {
+        0: ["sedih","nangis","down","putus","ditinggal","sepi","galau","hampa","nyesel"],
+        1: ["bahagia","senang","happy","gembira","excited","lega","bangga"],
+        2: ["cinta","sayang","rindu","kangen","jatuh cinta","naksir"],
+        3: ["marah","kesal","benci","emosi","jengkel","muak","sebal"],
+        4: ["takut","cemas","khawatir","panik","nervous","gelisah","anxious","stress"],
+        5: ["kaget","shock","terkejut","astaga"],
+    }
+    for emo, kws in rules.items():
         if any(k in t for k in kws): return emo
     return None
 
-def predict_emotion(text, em, ev):
-    rb = rule_emotion(text)
-    if rb is not None: return rb, 0.95
+def lexicon_emotion(text: str):
     t = text.lower()
     sc = {}
-    for w, e in LEXICON.items():
+    for w, e in emotion_lexicon.items():
         if w in t: sc[e] = sc.get(e,0)+1
-    if sc: return max(sc, key=sc.get), 0.85
+    return max(sc, key=sc.get) if sc else None
+
+def predict_emotion_ml(text, em, ev):
     cl = preprocess(text)
-    if not cl: return 1, 0.5
+    if not cl: return 0, 0.5
     pr = em.predict_proba(ev.transform([cl]))[0]
     return int(np.argmax(pr)), float(pr.max())
+
+def predict_emotion(text, em, ev):
+    rb = rule_based_emotion(text)
+    if rb is not None: return rb, 0.95
+    lx = lexicon_emotion(text)
+    if lx is not None: return lx, 0.85
+    return predict_emotion_ml(text, em, ev)
 
 def predict_mbti_passive(text, mm, mv, hist):
     hist.append(text)
     if len(hist) < 2: return None, 0.0
     cl = preprocess(' '.join(hist[-10:]))
     if not cl: return None, 0.0
-    X = mv.transform([cl])
+    X  = mv.transform([cl])
     return mm.predict(X)[0], float(mm.predict_proba(X)[0].max())
 
 # ── MBTI ───────────────────────────────────────────────────────────────────────
-MBTI_Q = [
-    {"id":1,"q":"Ketika menghadapi masalah besar, kamu lebih suka:","A":"Langsung cari solusi praktis","B":"Merenung dan mikirin berbagai kemungkinan","w":{"A":"S","B":"N"}},
-    {"id":2,"q":"Di waktu luang, kamu lebih menikmati:","A":"Kumpul dan sosialisasi sama banyak orang","B":"Waktu sendiri untuk recharge","w":{"A":"E","B":"I"}},
-    {"id":3,"q":"Saat ambil keputusan penting, kamu lebih andalkan:","A":"Logika dan analisis objektif","B":"Perasaan dan nilai-nilai pribadi","w":{"A":"T","B":"F"}},
-    {"id":4,"q":"Gaya hidupmu sehari-hari:","A":"Terstruktur dengan jadwal jelas","B":"Fleksibel dan ngikutin situasi","w":{"A":"J","B":"P"}},
-    {"id":5,"q":"Waktu belajar hal baru:","A":"Langsung praktek dan hands-on","B":"Baca teori dan pahami konsepnya dulu","w":{"A":"S","B":"N"}},
-    {"id":6,"q":"Di grup diskusi, biasanya kamu:","A":"Aktif dan sering mulai topik baru","B":"Lebih banyak dengerin, sesekali komentar","w":{"A":"E","B":"I"}},
-    {"id":7,"q":"Kalau teman curhat masalah, responsmu:","A":"Langsung kasih solusi praktis","B":"Dengerin dulu dan kasih dukungan emosional","w":{"A":"T","B":"F"}},
-    {"id":8,"q":"Menjelang deadline, kamu biasanya:","A":"Selesaikan jauh-jauh hari","B":"Paling produktif di menit-menit akhir","w":{"A":"J","B":"P"}},
-    {"id":9,"q":"Kamu lebih tertarik pada:","A":"Fakta, detail konkret, pengalaman nyata","B":"Pola, kemungkinan besar, gambaran besar","w":{"A":"S","B":"N"}},
-    {"id":10,"q":"Setelah seharian interaksi sosial, kamu:","A":"Makin semangat dan energized","B":"Capek dan butuh waktu sendiri","w":{"A":"E","B":"I"}},
+MBTI_QUESTIONS = [
+    {"id":1,"question":"Ketika menghadapi masalah besar, kamu lebih suka:","A":"Mencari solusi praktis dan langsung bertindak","B":"Merenung dan memikirkan berbagai kemungkinan dulu","weight":{"A":"S","B":"N"}},
+    {"id":2,"question":"Di waktu luang, kamu lebih menikmati:","A":"Berkumpul dan bersosialisasi dengan banyak orang","B":"Waktu sendiri untuk mengisi ulang energi","weight":{"A":"E","B":"I"}},
+    {"id":3,"question":"Saat mengambil keputusan penting, kamu lebih mengandalkan:","A":"Logika dan analisis objektif","B":"Perasaan dan nilai-nilai pribadi","weight":{"A":"T","B":"F"}},
+    {"id":4,"question":"Gaya hidup sehari-harimu lebih ke mana?","A":"Terstruktur dengan jadwal dan rencana jelas","B":"Fleksibel dan mengikuti alur situasi","weight":{"A":"J","B":"P"}},
+    {"id":5,"question":"Ketika belajar hal baru, kamu lebih suka:","A":"Langsung praktek dan hands-on","B":"Baca teori dan pahami konsepnya dulu","weight":{"A":"S","B":"N"}},
+    {"id":6,"question":"Dalam group chat atau diskusi, biasanya kamu:","A":"Aktif merespon dan sering mulai topik baru","B":"Lebih banyak membaca, sesekali baru komentar","weight":{"A":"E","B":"I"}},
+    {"id":7,"question":"Kalau teman curhat masalah, respons pertamamu biasanya:","A":"Langsung kasih solusi praktis","B":"Dengerin dulu dan kasih dukungan emosional","weight":{"A":"T","B":"F"}},
+    {"id":8,"question":"Menjelang deadline, kamu biasanya:","A":"Selesaikan tugas jauh-jauh hari sebelumnya","B":"Paling produktif justru di menit-menit akhir","weight":{"A":"J","B":"P"}},
+    {"id":9,"question":"Kamu lebih tertarik pada:","A":"Fakta, detail konkret, dan pengalaman nyata","B":"Pola, kemungkinan besar, dan gambaran besar","weight":{"A":"S","B":"N"}},
+    {"id":10,"question":"Setelah seharian interaksi dengan banyak orang, kamu merasa:","A":"Makin bersemangat dan energized","B":"Lelah dan butuh waktu sendiri untuk recharge","weight":{"A":"E","B":"I"}},
 ]
 
 MBTI_DESC = {
-    "ISTJ":("The Logistician","Praktis, faktual, terorganisir — orang yang bisa diandalkan."),
-    "ISFJ":("The Defender","Penyayang, hangat, selalu siap melindungi orang yang dicintai."),
-    "INFJ":("The Advocate","Idealistik, berprinsip, visioner — lihat dunia dengan cara unik."),
-    "INTJ":("The Architect","Strategis, logis, selalu mikir jangka panjang. Masterplanner sejati."),
-    "ISTP":("The Virtuoso","Pragmatis, fleksibel, jago banget mecahin masalah teknis."),
-    "ISFP":("The Adventurer","Artistik, spontan, selalu hidup di saat ini dengan penuh warna."),
-    "INFP":("The Mediator","Idealis, empatik, selalu cari makna di balik setiap hal."),
-    "INTP":("The Logician","Inovatif, analitis, pencinta teori yang selalu ingin tahu."),
-    "ESTP":("The Entrepreneur","Enerjik, action-oriented, persuasif. Suka tantangan nyata."),
-    "ESFP":("The Entertainer","Hangat, ramah, suka jadi pusat perhatian yang bikin suasana hidup."),
-    "ENFP":("The Campaigner","Antusias, kreatif, inspiratif — bisa nyalaiin semangat orang lain."),
-    "ENTP":("The Debater","Cerdas, suka tantangan intelektual, inovatif dalam berpikir."),
-    "ESTJ":("The Executive","Tegas, terorganisir, efisien. Natural leader yang result-oriented."),
-    "ESFJ":("The Consul","Penyayang, populer, selalu mau bantu. Sosok yang semua orang suka."),
-    "ENFJ":("The Protagonist","Karismatik, inspiratif, suka bimbing orang ke versi terbaiknya."),
-    "ENTJ":("The Commander","Berwibawa, strategis, pemimpin alami yang penuh visi besar."),
+    "ISTJ":{"name":"The Logistician","desc":"Praktis, faktual, dan sangat terorganisir. Kamu adalah orang yang bisa diandalkan."},
+    "ISFJ":{"name":"The Defender","desc":"Penyayang, hangat, dan selalu siap melindungi orang yang kamu cintai."},
+    "INFJ":{"name":"The Advocate","desc":"Idealistik, berprinsip, dan visioner. Kamu melihat dunia dengan cara yang unik."},
+    "INTJ":{"name":"The Architect","desc":"Strategis, logis, dan selalu berpikir jangka panjang. Masterplanner sejati."},
+    "ISTP":{"name":"The Virtuoso","desc":"Pragmatis, fleksibel, dan jago banget memecahkan masalah teknis."},
+    "ISFP":{"name":"The Adventurer","desc":"Artistik, spontan, dan selalu hidup di saat ini dengan penuh warna."},
+    "INFP":{"name":"The Mediator","desc":"Idealis, empatik, dan selalu mencari makna di balik setiap hal."},
+    "INTP":{"name":"The Logician","desc":"Inovatif, analitis, dan pencinta teori yang selalu ingin tahu."},
+    "ESTP":{"name":"The Entrepreneur","desc":"Enerjik, action-oriented, dan persuasif. Kamu suka tantangan nyata."},
+    "ESFP":{"name":"The Entertainer","desc":"Hangat, ramah, dan suka jadi pusat perhatian yang bikin suasana hidup."},
+    "ENFP":{"name":"The Campaigner","desc":"Antusias, kreatif, dan inspiratif. Kamu bisa menyalakan semangat orang lain."},
+    "ENTP":{"name":"The Debater","desc":"Cerdas, suka tantangan intelektual, dan inovatif dalam berpikir."},
+    "ESTJ":{"name":"The Executive","desc":"Tegas, terorganisir, dan efisien. Natural leader yang hasil-oriented."},
+    "ESFJ":{"name":"The Consul","desc":"Penyayang, populer, dan selalu mau membantu. Sosok yang semua orang suka."},
+    "ENFJ":{"name":"The Protagonist","desc":"Karismatik, inspiratif, dan suka membimbing orang menuju versi terbaiknya."},
+    "ENTJ":{"name":"The Commander","desc":"Berwibawa, strategis, dan pemimpin alami yang penuh visi besar."},
 }
 
 DIM_EXP = {
-    "E":"Ekstrovert — energi dari interaksi sosial",
-    "I":"Introvert — energi dari waktu sendiri",
-    "S":"Sensing — fokus pada fakta & detail",
-    "N":"Intuition — fokus pada pola & kemungkinan",
-    "T":"Thinking — keputusan berdasarkan logika",
-    "F":"Feeling — keputusan berdasarkan nilai & perasaan",
-    "J":"Judging — suka struktur & perencanaan",
-    "P":"Perceiving — fleksibel & adaptif",
+    "E":"Ekstrovert — Energimu datang dari interaksi sosial",
+    "I":"Introvert — Energimu datang dari waktu sendiri",
+    "S":"Sensing — Kamu fokus pada fakta dan detail konkret",
+    "N":"Intuition — Kamu fokus pada pola dan kemungkinan besar",
+    "T":"Thinking — Keputusanmu berdasarkan logika dan analisis",
+    "F":"Feeling — Keputusanmu berdasarkan nilai dan perasaan",
+    "J":"Judging — Kamu suka struktur dan perencanaan yang jelas",
+    "P":"Perceiving — Kamu fleksibel dan adaptif terhadap situasi",
 }
 
 def analyze_mbti(responses):
-    sc = {k:0 for k in "EISNTFJP"}
+    sc = {"E":0,"I":0,"S":0,"N":0,"T":0,"F":0,"J":0,"P":0}
     for r in responses:
-        q = next((x for x in MBTI_Q if x["id"]==r["qid"]), None)
-        if q and r["ans"] in q["w"]: sc[q["w"][r["ans"]]] += 1
+        q = next((x for x in MBTI_QUESTIONS if x["id"]==r["question_id"]), None)
+        if q and r["answer"] in q["weight"]: sc[q["weight"][r["answer"]]] += 1
     return (("E" if sc["E"]>=sc["I"] else "I") +
             ("S" if sc["S"]>=sc["N"] else "N") +
             ("T" if sc["T"]>=sc["F"] else "F") +
             ("J" if sc["J"]>=sc["P"] else "P"))
 
-# ── Groq AI ────────────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """Kamu adalah PersonaTalk — teman curhat AI yang terasa seperti sahabat dekat.
+def format_mbti_result(mbti_type):
+    info = MBTI_DESC.get(mbti_type, {"name":"Unknown","desc":""})
+    dims = [f"• {d} → {DIM_EXP.get(d,'')}" for d in mbti_type if d in DIM_EXP]
+    return (f"🧠 **Tipe Kepribadianmu: {mbti_type}**\n"
+            f"📋 *{info['name']}*\n\n{info['desc']}\n\n"
+            f"**Breakdown dimensimu:**\n" + "\n".join(dims))
 
-Kamu hangat, empatik, kadang playful, tidak menghakimi. Bukan AI/bot/assistant.
+# ── AI Response ────────────────────────────────────────────────────────────────
+SYSTEM_PROMPT = """Kamu adalah PersonaTalk — sahabat curhat digital yang beneran peduli, bukan robot atau konselor formal.
 
-Cara berbicara:
-- Bahasa Indonesia santai, boleh mix English
-- 2-4 kalimat, tidak lebih
-- Pembuka bervariasi: "Duh,", "Ooh,", "Wah,", "Hmm,", "Ya Allah,", "Aduh,", "Serius?", "Oof,"
-- Akhiri dengan satu pertanyaan terbuka relevan
-- Tidak pakai bullet point
+KARAKTER KAMU:
+Kamu seperti teman SMA/kuliah yang udah kenal lama, nyambung, hangat, dan nggak pernah ngehakimin.
 
-Pantangan: jangan ulangi pertanyaan yang sudah dijawab, jangan diagnosis, jangan lebih dari 4 kalimat."""
+CARA NGOBROL:
+- Bahasa Indonesia sehari-hari, santai, campuran indo-english boleh
+- Mulai SELALU dengan validasi perasaan dulu
+- Empati harus berasa nyata, bukan template
+- Gunakan ekspresi natural: "duh", "hmm", "ya Allah", "aduh", "serius?", "waduh"
+- 2-4 kalimat aja, jangan panjang
+- Di akhir selalu tanya SATU pertanyaan terbuka yang relevan
+- Jangan pakai bullet point atau format kaku
+- Jangan bilang "sebagai AI"
 
-def is_dup(new, prev, thr=0.50):
-    if not prev or not new: return False
-    nc = new.lower().strip()
-    for old in prev[-3:]:
-        oc = old.lower().strip()
-        if nc == oc: return True
-        nw, ow = set(nc.split()), set(oc.split())
-        if len(nw & ow) / max(len(nw | ow), 1) > thr: return True
-    return False
-
-def clean_text(text):
-    text = re.sub(r'\[Emosi user.*?\]', '', text, flags=re.DOTALL)
-    return re.sub(r'##\s+', '', text).strip()
+PANTANGAN:
+- Jangan diagnosis medis/psikologis
+- Jangan jawaban template generik
+- Jangan lebih dari 4 kalimat"""
 
 def get_ai_response(user_text, emotion_id, history, last_resp):
     if not _GROQ_OK or not GROQ_KEY: return None
-    emo_name  = EMO_LABEL.get(emotion_id, "Netral")
+    emo_name  = emotion_labels.get(emotion_id, "Netral")
     no_repeat = (" | Jangan ulangi: " + " // ".join(r[:70] for r in last_resp[-2:])) if last_resp else ""
     hint      = f"[Emosi user: {emo_name}{no_repeat}]"
     msgs      = [{"role":"system","content":SYSTEM_PROMPT}]
@@ -228,323 +235,256 @@ def get_ai_response(user_text, emotion_id, history, last_resp):
         client = Groq(api_key=GROQ_KEY)
         resp   = client.chat.completions.create(
             model="llama-3.3-70b-versatile", messages=msgs, max_tokens=400, temperature=0.85)
-        text   = clean_text(resp.choices[0].message.content)
-        if text and len(text) > 10:
-            if not is_dup(text, last_resp): return text
-            msgs += [{"role":"assistant","content":text},
-                     {"role":"user","content":"Gunakan pembuka berbeda dan pertanyaan penutup beda topik."}]
-            r2 = client.chat.completions.create(
-                model="llama-3.3-70b-versatile", messages=msgs, max_tokens=400, temperature=0.95)
-            t2 = clean_text(r2.choices[0].message.content)
-            if t2 and len(t2) > 10: return t2
+        text = resp.choices[0].message.content.strip()
+        text = re.sub(r'\[Emosi user.*?\]','',text,flags=re.DOTALL).strip()
+        return text if text and len(text)>10 else None
     except Exception as e:
         st.session_state['_ai_err'] = str(e)[:150]
     return None
 
-def fallback_response(text, emotion, history):
-    t  = text.lower()
-    fc = ' '.join(m['content'].lower() for m in (history or [])[-5:] if m['role']=='user')
+def fallback_response(text, emotion):
+    t = text.lower()
     for kws, opts in {
-        ('putus','ditinggal'):    ["Duh, berasa ada yang ilang tiba-tiba ya. Kamu lagi sendirian?","Aduh, ini pasti menyakitkan. Udah cerita ke orang terdekat belum?"],
-        ('selingkuh','khianatin'):["Oof, diselingkuhin itu rasa sakitnya berlapis. Dia udah tau ketahuan?","Ya Allah, dikhianatin itu beda levelnya. Kamu lagi gimana?"],
-        ('rindu','kangen'):       ["Kangen yang dalam kayak gini nyesek banget. Kamu kangen orangnya atau momennya?"],
-        ('capek','lelah'):        ["Capek yang kayak gini beda — bukan cuma fisik. Dari kerjaan atau hubungan?"],
-        ('cemas','khawatir'):     ["Gelisah kayak gini nggak enak. Ini overthinking atau ada trigger nyata?"],
-        ('naksir','gebetan'):     ["Ooh, ada yang spesial nih! Dia udah tau kamu naksir?"],
+        ('putus','ditinggal','selingkuh'):
+            ["Aduh, itu pasti nyakitin banget... wajar banget kalau sekarang rasanya hancur. Udah cerita ke siapa belum?",
+             "Duh, itu pasti bikin kamu ngerasa down banget. Mau cerita lebih detail nggak?"],
+        ('bingung','harus apa','mau ngapain'):
+            ["Hmm, ngerasa kayak tiba-tiba harus jalan sendiri dan bingung mulai dari mana ya? Yang paling bikin kamu kepikiran sekarang apa?"],
+        ('capek','lelah','burnout'):
+            ["Hmm, capek yang kayak gini tuh beda sama capek biasa. Ini capek dari mana — fisik, pikiran, atau keduanya?"],
+        ('marah','kesal','benci','kesel'):
+            ["Iya, situasi kayak gitu emang bikin darah naik. Boleh cerita lebih — ini karena apa atau siapa?"],
+        ('takut','cemas','khawatir','anxious'):
+            ["Hmm, ngerasa cemas itu nggak enak banget ya. Ini soal apa yang bikin kamu khawatir?"],
     }.items():
-        if any(k in fc or k in t for k in kws): return random.choice(opts)
-    return random.choice({
-        1:["Wah, ada yang bagus nih! Apaan yang terjadi?"],
-        2:["Ooh, ada yang spesial nih! Cerita dong."],
-        3:["Kemarahan kayak gini valid. Ini marah sama orangnya atau situasinya?"],
-        4:["Gelisah kayak gini nggak enak. Soal apa yang paling bikin khawatir?"],
-        0:["Duh, kedengarannya berat. Mau cerita lebih? Aku dengerin."],
-        5:["Serius?! Apaan yang bikin kaget banget?"],
-    }.get(emotion, ["Hmm, ada apa? Cerita yuk."]))
+        if any(k in t for k in kws): return random.choice(opts)
+    openers = {
+        0: ["Duh, kedengarannya berat banget... cerita lebih dong, aku dengerin."],
+        1: ["Wah, ada kabar baik nih kayaknya! Cerita dong!"],
+        2: ["Ada yang spesial nih kayaknya 😊 Cerita yuk!"],
+        3: ["Kayaknya ada yang bikin kamu kesel nih. Boleh cerita — ini soal apa?"],
+        4: ["Kayaknya ada yang lagi bikin kamu khawatir. Cerita yuk, biar agak lega."],
+        5: ["Wah, ada kejutan nih! Cerita dong lebih lengkapnya!"],
+    }
+    return random.choice(openers.get(emotion, ["Hmm, cerita lebih yuk. Aku dengerin kok."]))
 
-# ── Mood Donut SVG ─────────────────────────────────────────────────────────────
-def mood_donut_svg(emo_counts, size=80):
-    total    = sum(emo_counts.values()) or 1
-    pcts     = [emo_counts.get(i,0)/total for i in range(6)]
-    has_data = any(v>0 for v in emo_counts.values())
-    dominant = max(emo_counts, key=emo_counts.get) if has_data else 1
-    dom_pct  = int(pcts[dominant]*100)
-    colors   = [EMO_COLOR[i] for i in range(6)]
-    emojis   = ['😢','😊','😍','😤','😰','😲']
-    r, cx, cy, inner_r = 45, 50, 50, 28
-    paths, off = "", 0.0
-    for i, pct in enumerate(pcts):
-        if pct < 0.005: off += pct; continue
-        a1, a2 = off*360-90, (off+pct)*360-90
-        large  = 1 if pct>0.5 else 0
-        def pt(a, _r=r, _cx=cx, _cy=cy):
-            rad = math.radians(a)
-            return _cx+_r*math.cos(rad), _cy+_r*math.sin(rad)
-        x1,y1 = pt(a1); x2,y2 = pt(a2)
-        paths += f'<path d="M{cx},{cy}L{x1:.1f},{y1:.1f}A{r},{r},0,{large},1,{x2:.1f},{y2:.1f}Z" fill="{colors[i]}" opacity="0.9"/>'
-        off += pct
-    if not has_data:
-        paths = f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="rgba(255,255,255,0.12)"/>'
-    return f"""<svg viewBox="0 0 100 100" width="{size}" height="{size}">
-        {paths}
-        <circle cx="{cx}" cy="{cy}" r="{inner_r}" fill="#0f172a"/>
-        <text x="{cx}" y="{cy-5}" text-anchor="middle" font-size="14">{emojis[dominant]}</text>
-        <text x="{cx}" y="{cy+10}" text-anchor="middle" fill="white" font-size="9" font-weight="bold">{dom_pct}%</text>
-    </svg>"""
+# ── Visualization ──────────────────────────────────────────────────────────────
+def create_radar_chart(mbti: str):
+    if not mbti or len(mbti) != 4: return None
+    dimensions  = ['E vs I', 'S vs N', 'T vs F', 'J vs P']
+    char_scores = {'E':75,'I':25,'S':75,'N':25,'T':75,'F':25,'J':75,'P':25}
+    values = [char_scores.get(mbti[0],50), char_scores.get(mbti[1],50),
+              char_scores.get(mbti[2],50), char_scores.get(mbti[3],50)]
+    fig = go.Figure(data=go.Scatterpolar(
+        r=values+[values[0]], theta=dimensions+[dimensions[0]],
+        fill='toself',
+        marker=dict(color='rgba(0,255,200,0.8)'),
+        line=dict(color='#00ffc8', width=2)
+    ))
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0,100], color='white'),
+            angularaxis=dict(color='white'),
+            bgcolor='rgba(0,0,0,0)'
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white'),
+        height=250,
+        margin=dict(l=30,r=30,t=30,b=30),
+        showlegend=False
+    )
+    return fig
 
-# ── Build ALL chat bubbles as ONE HTML string ──────────────────────────────────
-def build_chat_html(messages):
-    html = ""
-    for msg in messages:
-        # Escape HTML special chars, preserve newlines as <br>
-        content = (msg['content']
-                   .replace('&','&amp;')
-                   .replace('<','&lt;')
-                   .replace('>','&gt;')
-                   .replace('\n','<br>'))
-        if msg['role'] == 'user':
-            html += f"""
-            <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-                <div style="
-                    background:linear-gradient(135deg,#3b82f6,#2a5ba8);
-                    border-radius:18px 18px 4px 18px;
-                    padding:11px 16px;max-width:70%;
-                    font-size:14px;color:white;line-height:1.6;
-                    box-shadow:0 2px 10px rgba(59,130,246,0.35);
-                    word-wrap:break-word;
-                ">{content}</div>
-            </div>"""
-        else:
-            html += f"""
-            <div style="display:flex;justify-content:flex-start;margin-bottom:10px;">
-                <div style="
-                    background:linear-gradient(135deg,#4a90d9,#2a5ba8);
-                    border-radius:18px 18px 18px 4px;
-                    padding:11px 16px;max-width:70%;
-                    font-size:14px;color:white;line-height:1.6;
-                    box-shadow:0 2px 8px rgba(42,91,168,0.2);
-                    border:1px solid rgba(255,255,255,0.15);
-                    word-wrap:break-word;
-                ">{content}</div>
-            </div>"""
-    return html
+def get_labubu_avatar(emotion=0):
+    mood_map = {
+        0:{"emoji":"🦊","color":"#4a90e2"},
+        1:{"emoji":"🐱","color":"#f1c40f"},
+        2:{"emoji":"🐰","color":"#ff69b4"},
+        3:{"emoji":"🐯","color":"#e74c3c"},
+        4:{"emoji":"🐭","color":"#9b59b6"},
+        5:{"emoji":"🐨","color":"#f39c12"},
+    }
+    mood = mood_map.get(emotion, {"emoji":"🐼","color":"#00ffff"})
+    return f'<span style="font-size:2rem;filter:drop-shadow(0 0 8px {mood["color"]});">{mood["emoji"]}</span>'
+
+def labubu_animation(emotion=0):
+    chars  = {0:"🦊",1:"🐱",2:"🐰",3:"🐯",4:"🐭",5:"🐨"}
+    labels = {0:"Sedih",1:"Happy",2:"Love",3:"Marah",4:"Cemas",5:"Kaget"}
+    char  = chars.get(emotion,"🐼")
+    label = labels.get(emotion,"Normal")
+    return f"""
+    <div style="display:flex;justify-content:center;align-items:center;
+                padding:15px;background:rgba(255,255,255,0.04);
+                border-radius:50px;margin:10px 0;border:1px solid rgba(255,255,255,0.08);">
+        <span style="font-size:1.8rem;margin:0 8px;opacity:0.5;">🐼</span>
+        <span style="font-size:2.8rem;margin:0 8px;animation:bounce 2s infinite ease-in-out;">{char}</span>
+        <span style="font-size:1.8rem;margin:0 8px;opacity:0.5;">🐼</span>
+    </div>
+    <div style="text-align:center;margin:-5px 0 12px 0;">
+        <span style="background:rgba(255,255,255,0.08);padding:4px 14px;
+                     border-radius:20px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+            Labubu lagi {label}
+        </span>
+    </div>
+    <style>
+    @keyframes bounce {{
+        0%,100% {{ transform:translateY(0); }}
+        50% {{ transform:translateY(-8px); }}
+    }}
+    </style>"""
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
 def inject_css():
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body, [class*="css"] { font-family: 'Poppins', sans-serif !important; }
-
-/* App background */
-.stApp { background: linear-gradient(135deg,#1a3a6b 0%,#2a5ba8 50%,#4a90d9 100%) !important; }
-
-/* Hide Streamlit chrome */
-#MainMenu, footer, header,
-[data-testid="stToolbar"],
-[data-testid="stDecoration"],
-[data-testid="stStatusWidget"] { display:none !important; }
-
-/* Main block */
-.main .block-container { padding:1.5rem 2rem 2rem !important; max-width:100% !important; }
-
-/* ── SIDEBAR (dark) ── */
-section[data-testid="stSidebar"] {
-    background: #0f172a !important;
-    border-right: 1px solid rgba(255,255,255,0.07) !important;
-    min-width: 250px !important;
-    max-width: 250px !important;
+html, body, [class*="css"] {
+    font-family: 'Nunito', sans-serif !important;
+    color: #ffffff !important;
 }
-section[data-testid="stSidebar"] > div { padding: 1.4rem 1rem !important; }
 
-/* All sidebar text white */
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] div,
-section[data-testid="stSidebar"] label { color: rgba(255,255,255,0.85) !important; }
-
-/* Sidebar toggle arrow */
-[data-testid="collapsedControl"] {
-    background: #1e3a5f !important;
-    border-radius: 0 10px 10px 0 !important;
-    color: white !important;
-    transition: background 0.25s !important;
+.stApp {
+    background: linear-gradient(135deg, #0f0c1f 0%, #1a1a2e 50%, #16213e 100%);
 }
-[data-testid="collapsedControl"]:hover { background: #2a5ba8 !important; }
 
-/* Sidebar nav buttons */
-section[data-testid="stSidebar"] .stButton > button {
+.main > div {
     background: transparent !important;
-    border: none !important;
-    border-radius: 12px !important;
-    color: rgba(255,255,255,0.65) !important;
-    font-family: 'Poppins', sans-serif !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    padding: 10px 14px !important;
-    width: 100% !important;
-    justify-content: flex-start !important;
-    transition: all 0.18s ease !important;
-    margin-bottom: 3px !important;
-    box-shadow: none !important;
-}
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.08) !important;
-    color: white !important;
-    transform: translateX(2px) !important;
+    padding: 1rem 2rem !important;
 }
 
-/* Active nav button */
-.nav-active > .stButton > button {
-    background: #1d4ed8 !important;
-    color: white !important;
-    font-weight: 600 !important;
-    box-shadow: 0 2px 10px rgba(29,78,216,0.4) !important;
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: rgba(10,10,25,0.95) !important;
+    backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(0,255,200,0.15);
 }
-.nav-active > .stButton > button:hover {
-    background: #1e40af !important;
-    color: white !important;
-    transform: none !important;
+section[data-testid="stSidebar"] * { color: white !important; }
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 { color: #00ffc8 !important; }
+
+/* ── Chat bubbles ── */
+.chat-wrap {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 18px;
+    animation: floatIn 0.3s ease;
+}
+.chat-wrap.user { flex-direction: row-reverse; }
+.bubble {
+    padding: 14px 18px;
+    border-radius: 18px;
+    max-width: 72%;
+    font-size: 15px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.bubble.bot {
+    background: rgba(30,30,55,0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px 18px 18px 18px;
+    backdrop-filter: blur(8px);
+}
+.bubble.user {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 18px 4px 18px 18px;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+.avatar { font-size: 1.8rem; margin: 0 10px; align-self: flex-end; }
+
+/* ── Metrics ── */
+[data-testid="stMetricValue"] { color: #00ffc8 !important; }
+[data-testid="stMetricLabel"] { color: rgba(255,255,255,0.6) !important; }
+
+/* ── Progress bar ── */
+.stProgress > div > div > div > div {
+    background: linear-gradient(90deg, #00ffc8, #667eea) !important;
 }
 
-/* Send button */
-.send-btn .stButton > button {
-    background: #3b82f6 !important;
-    border: none !important;
-    border-radius: 50% !important;
-    color: white !important;
-    font-size: 18px !important;
-    width: 46px !important;
-    height: 46px !important;
-    padding: 0 !important;
-    min-height: unset !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    transition: all 0.2s !important;
-    box-shadow: 0 4px 14px rgba(59,130,246,0.5) !important;
-}
-.send-btn .stButton > button:hover {
-    background: #2563eb !important;
-    transform: scale(1.08) !important;
-    box-shadow: 0 6px 20px rgba(59,130,246,0.6) !important;
-}
-
-/* MBTI choice buttons */
-.mbti-btn .stButton > button {
-    background: white !important;
-    color: #1e293b !important;
-    border: 2px solid #e2e8f0 !important;
-    border-radius: 14px !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    white-space: normal !important;
-    height: auto !important;
-    min-height: 56px !important;
-    padding: 13px 16px !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    line-height: 1.5 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-    transition: all 0.18s !important;
-}
-.mbti-btn .stButton > button:hover {
-    background: #3b82f6 !important;
-    color: white !important;
-    border-color: #3b82f6 !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(59,130,246,0.35) !important;
-}
-
-/* Action / reset buttons */
-.action-btn .stButton > button {
-    background: rgba(255,255,255,0.08) !important;
-    color: rgba(255,255,255,0.75) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 12px !important;
-    box-shadow: none !important;
-    font-size: 13px !important;
-    padding: 10px 18px !important;
-    transition: all 0.18s !important;
-}
-.action-btn .stButton > button:hover {
-    background: rgba(255,255,255,0.14) !important;
-    color: white !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-/* White card action buttons */
-.action-btn-white .stButton > button {
-    background: white !important;
-    color: #334155 !important;
-    border: 1.5px solid #e2e8f0 !important;
-    border-radius: 12px !important;
-    box-shadow: none !important;
-    font-size: 13px !important;
-    padding: 10px 18px !important;
-    transition: all 0.18s !important;
-}
-.action-btn-white .stButton > button:hover {
-    background: #dbeafe !important;
-    color: #1d4ed8 !important;
-    border-color: #bfdbfe !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-/* Text input */
+/* ── Text input ── */
 .stTextInput > div > div > input {
-    background: white !important;
-    border: 1.5px solid #e2e8f0 !important;
-    border-radius: 28px !important;
-    color: #1e293b !important;
-    font-family: 'Poppins', sans-serif !important;
-    font-size: 14px !important;
-    padding: 12px 20px !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
-    transition: all 0.2s !important;
+    background: rgba(20,20,40,0.9) !important;
+    border: 2px solid rgba(0,255,200,0.4) !important;
+    border-radius: 30px !important;
+    color: white !important;
+    font-size: 15px !important;
+    padding: 14px 22px !important;
+    caret-color: #00ffc8;
 }
 .stTextInput > div > div > input:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important;
-    outline: none !important;
+    border-color: #00ffc8 !important;
+    box-shadow: 0 0 20px rgba(0,255,200,0.3) !important;
 }
-.stTextInput > div > div > input::placeholder { color: #94a3b8 !important; }
-.stTextInput label { display: none !important; }
-
-/* Form */
-[data-testid="stForm"] { background:transparent !important; border:none !important; padding:0 !important; }
-
-/* Progress bar */
-.stProgress > div > div > div > div {
-    background: linear-gradient(90deg,#3b82f6,#60a5fa) !important;
-    border-radius: 10px !important;
-}
-.stProgress > div > div { background:rgba(255,255,255,0.1) !important; border-radius:10px !important; }
-
-/* Sidebar progress (confidence bar) */
-section[data-testid="stSidebar"] .stProgress > div > div > div > div {
-    background: linear-gradient(90deg,#f59f00,#fbbf24) !important;
-}
-section[data-testid="stSidebar"] .stProgress > div > div {
-    background: rgba(255,255,255,0.12) !important;
+.stTextInput > div > div > input::placeholder {
+    color: rgba(255,255,255,0.4) !important;
 }
 
-/* Metric */
-[data-testid="stMetricValue"] { color: #60a5fa !important; font-weight:700 !important; }
-[data-testid="stMetricLabel"] { color: rgba(255,255,255,0.5) !important; font-size:12px !important; }
+/* ── Buttons ── */
+.stButton > button {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 30px !important;
+    padding: 14px 20px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    width: 100% !important;
+    height: 52px !important;
+    transition: all 0.3s ease !important;
+}
+.stButton > button:hover {
+    transform: scale(1.03) !important;
+    box-shadow: 0 0 20px rgba(102,126,234,0.6) !important;
+}
 
-/* HR */
-hr { border-color: rgba(255,255,255,0.08) !important; margin:12px 0 !important; }
+/* ── Radio ── */
+div[role="radiogroup"] {
+    background: rgba(15,25,45,0.8);
+    padding: 8px;
+    border-radius: 12px;
+}
+div[role="radiogroup"] label { color: white !important; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width:4px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:rgba(59,130,246,0.4); border-radius:4px; }
+/* ── Alert ── */
+.stAlert {
+    background: rgba(20,20,40,0.9) !important;
+    border: 1px solid rgba(0,255,200,0.3) !important;
+    border-radius: 12px !important;
+    color: white !important;
+}
+
+/* ── Form ── */
+[data-testid="stForm"] {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 10px;
+}
+
+@keyframes floatIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Welcome box ── */
+.welcome-box {
+    background: rgba(30,30,50,0.9);
+    border: 1px solid rgba(0,255,200,0.25);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0,255,200,0.1);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -555,306 +495,245 @@ hr { border-color: rgba(255,255,255,0.08) !important; margin:12px 0 !important; 
 def main():
     st.set_page_config(
         page_title="PersonaTalk",
-        page_icon="✳️",
         layout="wide",
         initial_sidebar_state="expanded",
+        page_icon="🐼"
     )
     inject_css()
 
-    with st.spinner("Memuat PersonaTalk..."):
+    # Load models
+    with st.spinner("⚡ Memuat PersonaTalk..."):
         emo_model, emo_vec, mbti_model, mbti_vec = load_models()
 
+    # Session state
     defaults = {
-        'messages':    [{'role':'bot','content':'Halo, Talk Friend! 👋 Aku PersonaTalk.\nCerita apa aja, aku dengerin ya!'}],
-        'emotion':     1, 'confidence': 0.5,
-        'mbti':        None, 'mbti_texts': [],
-        'last_bot':    [], 'emo_counts': {i:0 for i in range(6)},
-        '_ai_err':     None,
-        'mode':        'curhat',
-        'mbti_step':   0, 'mbti_resp': [], 'mbti_result': None,
-        '_last_input': '',
+        'messages': [{'role':'bot','content':"Halo! Aku PersonaTalk 🐼\n\nAku bisa jadi temen curhat kamu dan juga bantu analisis kepribadian MBTI-mu.\n\nMau ngobrol santai dulu atau langsung tes kepribadian? Cerita aja ya! 😊"}],
+        'current_emotion':         1,
+        'current_mbti':            None,
+        'last_confidence':         0.5,
+        'question_responses':      [],
+        'current_question_index':  -1,
+        'mode':                    '💬 Curhat',
+        'last_bot':                [],
+        'mbti_texts':              [],
+        '_ai_err':                 None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-    mode = st.session_state.mode
-    emo  = st.session_state.emotion
+    # ── Header ────────────────────────────────────────────────────────────────
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("""
+        <div style="text-align:center;padding:20px 0 10px 0;">
+            <h1 style="background:linear-gradient(45deg,#00ffc8,#667eea);
+                       -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                       font-size:3rem;margin:0;">🐼 PersonaTalk</h1>
+            <p style="color:rgba(255,255,255,0.7);font-size:1.1rem;margin-top:8px;">
+                Teman curhat dengan deteksi emosi & analisis kepribadian MBTI
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Welcome box ───────────────────────────────────────────────────────────
+    st.markdown("""
+    <div class="welcome-box">
+        <div style="font-size:2.5rem;margin-bottom:8px;">🐼✨</div>
+        <div style="font-size:1.4rem;font-weight:800;
+                    background:linear-gradient(45deg,#00ffc8,#667eea);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+            Selamat datang di PersonaTalk!
+        </div>
+        <div style="color:rgba(255,255,255,0.75);margin-top:10px;line-height:1.7;">
+            Halo! Aku di sini buat nemenin kamu ngobrol dan ngebantu kenali kepribadianmu.<br>
+            Pilih mode <b>Curhat</b> buat cerita santai, atau <b>Analisis MBTI</b>
+            buat tau tipe kepribadianmu! 😊
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════════════════════════════════
     # SIDEBAR
     # ══════════════════════════════════════════════════════════════════════════
     with st.sidebar:
+        st.markdown("## 🧠 Panel Analisis")
+        st.markdown("---")
 
-        # Logo
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px;padding-left:2px;">
-            <span style="color:#ef4444;font-size:22px;font-weight:900;line-height:1;">✳</span>
-            <div style="line-height:1.2;">
-                <div style="font-size:15px;font-weight:800;color:white;">persona</div>
-                <div style="font-size:15px;font-weight:800;color:white;">talk</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Mode switch
+        mode = st.radio(
+            "Mode Interaksi",
+            ["💬 Curhat", "🧬 Analisis MBTI"],
+            horizontal=True
+        )
+        if mode != st.session_state.mode:
+            st.session_state.mode = mode
+            if mode == "💬 Curhat":
+                st.session_state.current_question_index = -1
+                st.session_state.question_responses     = []
 
-        # ── Mode Switch ───────────────────────────────────────────────────────
-        st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.35);font-weight:700;letter-spacing:0.1em;margin-bottom:8px;padding-left:2px;">MODE INTERAKSI</div>', unsafe_allow_html=True)
+        st.markdown("---")
 
-        for key, icon, label in [('curhat','💬','Curhat'), ('mbti','🧠','Analisis MBTI')]:
-            is_active = (mode == key)
-            st.markdown('<div class="nav-active">' if is_active else '<div>', unsafe_allow_html=True)
-            if st.button(f"{icon}  {label}", key=f"mode_{key}", use_container_width=True):
-                st.session_state.mode = key
-                if key == 'mbti':
-                    st.session_state.mbti_step   = 0
-                    st.session_state.mbti_resp   = []
-                    st.session_state.mbti_result = None
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<hr>', unsafe_allow_html=True)
-
-        # ── Mood Terdeteksi ───────────────────────────────────────────────────
-        st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.35);font-weight:700;letter-spacing:0.1em;margin-bottom:10px;padding-left:2px;">MOOD TERDETEKSI</div>', unsafe_allow_html=True)
-
-        emo_name  = EMO_LABEL.get(emo, 'Netral')
-        emo_emoji = EMO_EMOJI.get(emo, '😊')
-        emo_color = EMO_COLOR.get(emo, '#3b82f6')
-
-        # Mood badge with colored left border
+        # Mood panel
+        st.markdown("### Mood Terdeteksi")
+        emo = st.session_state.current_emotion
+        current_mood = emotion_labels.get(emo, "Normal")
         st.markdown(f"""
-        <div style="
-            background:rgba(255,255,255,0.06);
-            border-left:4px solid {emo_color};
-            border-radius:0 12px 12px 0;
-            padding:12px 14px;
-            margin-bottom:14px;
-            display:flex;align-items:center;gap:10px;
-        ">
-            <span style="font-size:1.8rem;">{emo_emoji}</span>
-            <span style="font-size:1rem;font-weight:700;color:white;">{emo_name}</span>
+        <div style="background:rgba(0,255,200,0.08);border-left:4px solid #00ffc8;
+                    padding:12px;border-radius:10px;margin:8px 0;">
+            <span style="font-size:1.5rem;">{mood_icons.get(emo,'🐼')}</span>
+            <strong style="font-size:1.1rem;margin-left:8px;">{current_mood}</strong>
         </div>
         """, unsafe_allow_html=True)
 
-        # Donut chart + confidence number
-        donut    = mood_donut_svg(st.session_state.emo_counts, size=78)
-        conf_pct = int(st.session_state.confidence * 100)
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
-            <div>{donut}</div>
-            <div style="flex:1;">
-                <div style="color:rgba(255,255,255,0.45);font-size:11px;margin-bottom:3px;">Confidence</div>
-                <div style="font-size:1.4rem;font-weight:800;color:white;">{conf_pct}%</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.progress(st.session_state.confidence)
+        st.markdown(labubu_animation(emo), unsafe_allow_html=True)
+        st.markdown(f"**Confidence:** {st.session_state.last_confidence:.0%}")
+        st.progress(st.session_state.last_confidence)
 
-        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("---")
 
-        # ── MBTI Badge ────────────────────────────────────────────────────────
-        st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.35);font-weight:700;letter-spacing:0.1em;margin-bottom:10px;padding-left:2px;">KEPRIBADIAN MBTI</div>', unsafe_allow_html=True)
-
-        mbti_val = st.session_state.mbti
-        if mbti_val:
-            mbti_name = MBTI_DESC.get(mbti_val, ("?",""))[0]
+        # MBTI panel
+        if st.session_state.current_mbti:
+            st.markdown("### 🧬 Tipe MBTI")
+            fig = create_radar_chart(st.session_state.current_mbti)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
             st.markdown(f"""
-            <div style="
-                background:linear-gradient(135deg,#1d4ed8,#3b82f6);
-                border-radius:14px;padding:14px 16px;text-align:center;
-            ">
-                <div style="font-size:2rem;font-weight:800;color:white;letter-spacing:0.05em;">{mbti_val}</div>
-                <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:3px;">{mbti_name}</div>
+            <div style="text-align:center;margin-top:8px;">
+                <span style="background:linear-gradient(45deg,#00ffc8,#667eea);
+                             padding:8px 22px;border-radius:30px;color:white;
+                             font-weight:800;font-size:1.4rem;">
+                    {st.session_state.current_mbti}
+                </span>
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.markdown("""
-            <div style="
-                background:rgba(255,255,255,0.04);
-                border:1.5px dashed rgba(255,255,255,0.12);
-                border-radius:12px;padding:14px;text-align:center;
-            ">
-                <div style="color:rgba(255,255,255,0.35);font-size:12px;">Belum terdeteksi</div>
-                <div style="color:rgba(255,255,255,0.25);font-size:11px;margin-top:2px;">
-                    Mulai curhat atau ikuti quiz!
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info("💬 Mulai percakapan untuk prediksi MBTI")
 
-        st.markdown('<hr>', unsafe_allow_html=True)
+        st.markdown("---")
 
-        # ── Reset button ──────────────────────────────────────────────────────
-        st.markdown('<div class="action-btn">', unsafe_allow_html=True)
-        if st.button("🗑️  Reset Chat", key="reset_chat", use_container_width=True):
-            st.session_state.messages   = [{'role':'bot','content':'Halo, Talk Friend! 👋 Cerita apa aja, aku dengerin ya!'}]
-            st.session_state.emo_counts = {i:0 for i in range(6)}
-            st.session_state.last_bot   = []
-            st.session_state.mbti_texts = []
-            st.session_state._ai_err    = None
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # MAIN AREA
-    # ══════════════════════════════════════════════════════════════════════════
-
-    # Page header
-    st.markdown("""
-    <div style="padding:4px 0 18px;">
-        <div style="font-size:2rem;font-weight:800;color:white;line-height:1.2;">Halo, Talk Friend! 👋</div>
-        <div style="font-size:0.9rem;color:rgba(255,255,255,0.6);margin-top:4px;">Bagaimana kabar mu hari ini?</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    mode_title = "💬 Curhat" if mode == "curhat" else "🧠 Analisis MBTI"
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # CURHAT MODE
-    # ══════════════════════════════════════════════════════════════════════════
-    if mode == 'curhat':
-
-        # Build ALL messages into ONE html string → render in ONE st.markdown call
-        # This is the key: everything inside the white card div in one shot.
-        chat_html = build_chat_html(st.session_state.messages)
-
-        st.markdown(f"""
-        <div style="
-            background:white;
-            border-radius:20px;
-            padding:20px 22px 18px;
-            box-shadow:0 8px 32px rgba(0,0,0,0.12);
-            margin-bottom:14px;
-        ">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;">
-                {mode_title}
-            </div>
-            <div style="
-                min-height:260px;
-                max-height:400px;
-                overflow-y:auto;
-                padding-right:4px;
-            ">{chat_html}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Input row below card
-        with st.form("chat_form", clear_on_submit=True):
-            c1, c2 = st.columns([9, 1])
-            with c1:
-                user_input = st.text_input("", placeholder="Ketik pesanmu...", label_visibility="collapsed")
-            with c2:
-                st.markdown('<div class="send-btn">', unsafe_allow_html=True)
-                submitted = st.form_submit_button("✈️", use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-        if submitted and user_input and user_input.strip():
-            user_text = user_input.strip()
-            if user_text != st.session_state._last_input:
-                st.session_state._last_input = user_text
-                st.session_state.messages.append({'role':'user','content':user_text})
-
-                emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
-                st.session_state.emotion    = emo_id
-                st.session_state.confidence = conf
-                st.session_state.emo_counts[emo_id] = st.session_state.emo_counts.get(emo_id,0)+1
-
-                mbti_p, mbti_c = predict_mbti_passive(user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
-                if mbti_p and mbti_c > 0.3:
-                    st.session_state.mbti = mbti_p
-
-                response = get_ai_response(user_text, emo_id, st.session_state.messages, st.session_state.last_bot)
-                if not response:
-                    response = fallback_response(user_text, emo_id, st.session_state.messages)
-
-                st.session_state.last_bot.append(response)
-                st.session_state.messages.append({'role':'bot','content':response})
-                st.rerun()
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # MBTI QUIZ MODE
-    # ══════════════════════════════════════════════════════════════════════════
-    elif mode == 'mbti':
-        step   = st.session_state.mbti_step
-        result = st.session_state.mbti_result
-
-        if result:
-            name, desc = MBTI_DESC.get(result, ("Unknown","Tipe kepribadian unik."))
-            dims_html  = "".join(f"""
-                <div style="background:#f0f4ff;border-left:3px solid #3b82f6;
-                            border-radius:0 8px 8px 0;padding:9px 14px;
-                            margin-bottom:8px;font-size:13px;color:#334155;">
-                    <b style="color:#3b82f6;">{d}</b> — {DIM_EXP[d]}
-                </div>""" for d in result if d in DIM_EXP)
-
-            st.markdown(f"""
-            <div style="background:white;border-radius:20px;padding:24px 26px;
-                        box-shadow:0 8px 32px rgba(0,0,0,0.12);margin-bottom:14px;">
-                <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:18px;">{mode_title}</div>
-                <div style="text-align:center;padding:8px 0 22px;">
-                    <div style="font-size:3rem;font-weight:800;
-                                background:linear-gradient(135deg,#3b82f6,#2a5ba8);
-                                -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                                margin-bottom:6px;">{result}</div>
-                    <div style="font-size:1rem;font-weight:700;color:#1e293b;margin-bottom:6px;">{name}</div>
-                    <div style="font-size:13px;color:#64748b;max-width:400px;margin:0 auto;">{desc}</div>
-                </div>
-                <div style="max-width:460px;margin:0 auto;">{dims_html}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.markdown('<div class="action-btn-white">', unsafe_allow_html=True)
-            if st.button("🔄 Ulangi Analisis", key="reset_mbti"):
-                st.session_state.mbti_step   = 0
-                st.session_state.mbti_resp   = []
-                st.session_state.mbti_result = None
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        elif step < len(MBTI_Q):
-            q        = MBTI_Q[step]
-            progress = step / len(MBTI_Q)
-
-            # Question card
-            st.markdown(f"""
-            <div style="background:white;border-radius:20px;padding:22px 24px 18px;
-                        box-shadow:0 8px 32px rgba(0,0,0,0.12);margin-bottom:14px;">
-                <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;">{mode_title}</div>
-                <div style="display:flex;justify-content:space-between;
-                            font-size:12px;color:#94a3b8;margin-bottom:6px;">
-                    <span>Pertanyaan {step+1} dari {len(MBTI_Q)}</span>
-                    <span>{int(progress*100)}%</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
+        # MBTI quiz progress
+        if st.session_state.current_question_index >= 0:
+            total    = len(MBTI_QUESTIONS)
+            progress = min((st.session_state.current_question_index + 1) / total, 1.0)
             st.progress(progress)
+            st.caption(f"Pertanyaan {min(st.session_state.current_question_index+1, total)} dari {total}")
+            st.markdown("---")
 
+        # Reset
+        if st.button("🔄 Reset Chat", use_container_width=True):
+            for key in ['messages','current_emotion','current_mbti','last_confidence',
+                        'question_responses','current_question_index','last_bot',
+                        'mbti_texts','_ai_err']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # CHAT DISPLAY
+    # ══════════════════════════════════════════════════════════════════════════
+    for msg in st.session_state.messages:
+        is_user      = msg['role'] == 'user'
+        wrap_class   = "user" if is_user else "bot"
+        bubble_class = "user" if is_user else "bot"
+        avatar       = "👤" if is_user else get_labubu_avatar(st.session_state.current_emotion)
+
+        if is_user:
             st.markdown(f"""
-            <div style="font-size:15px;font-weight:600;color:white;
-                        margin:14px 0 18px;line-height:1.65;">{q['q']}</div>
+            <div class="chat-wrap {wrap_class}">
+                <div class="bubble {bubble_class}">{msg['content']}</div>
+                <div class="avatar">{avatar}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="chat-wrap {wrap_class}">
+                <div class="avatar">{avatar}</div>
+                <div class="bubble {bubble_class}">{msg['content']}</div>
+            </div>
             """, unsafe_allow_html=True)
 
-            ba, bb = st.columns(2)
-            with ba:
-                st.markdown('<div class="mbti-btn">', unsafe_allow_html=True)
-                if st.button(f"A.  {q['A']}", key=f"mbti_a_{step}", use_container_width=True):
-                    st.session_state.mbti_resp.append({"qid":q["id"],"ans":"A"})
-                    st.session_state.mbti_step += 1
-                    if st.session_state.mbti_step >= len(MBTI_Q):
-                        st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
-                        st.session_state.mbti = st.session_state.mbti_result
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-            with bb:
-                st.markdown('<div class="mbti-btn">', unsafe_allow_html=True)
-                if st.button(f"B.  {q['B']}", key=f"mbti_b_{step}", use_container_width=True):
-                    st.session_state.mbti_resp.append({"qid":q["id"],"ans":"B"})
-                    st.session_state.mbti_step += 1
-                    if st.session_state.mbti_step >= len(MBTI_Q):
-                        st.session_state.mbti_result = analyze_mbti(st.session_state.mbti_resp)
-                        st.session_state.mbti = st.session_state.mbti_result
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+    # ══════════════════════════════════════════════════════════════════════════
+    # INPUT FORM
+    # ══════════════════════════════════════════════════════════════════════════
+    with st.form("chat_form", clear_on_submit=True):
+        c1, c2 = st.columns([5,1])
+        with c1:
+            user_input = st.text_input(
+                "", placeholder="Ketik pesanmu di sini...",
+                label_visibility="collapsed"
+            )
+        with c2:
+            submitted = st.form_submit_button("📤 Kirim", use_container_width=True)
+
+    if submitted and user_input and user_input.strip():
+        user_text = user_input.strip()
+        st.session_state.messages.append({'role':'user','content':user_text})
+
+        # ── CURHAT MODE ───────────────────────────────────────────────────────
+        if st.session_state.mode == "💬 Curhat":
+            emo_id, conf = predict_emotion(user_text, emo_model, emo_vec)
+            st.session_state.current_emotion  = emo_id
+            st.session_state.last_confidence  = conf
+
+            mbti_p, mbti_c = predict_mbti_passive(
+                user_text, mbti_model, mbti_vec, st.session_state.mbti_texts)
+            if mbti_p and mbti_c > 0.3:
+                st.session_state.current_mbti = mbti_p
+
+            response = get_ai_response(
+                user_text, emo_id,
+                st.session_state.messages,
+                st.session_state.last_bot
+            )
+            if not response:
+                response = fallback_response(user_text, emo_id)
+
+            st.session_state.last_bot.append(response)
+            if len(st.session_state.last_bot) > 10:
+                st.session_state.last_bot.pop(0)
+            st.session_state.messages.append({'role':'bot','content':response})
+
+        # ── MBTI MODE ─────────────────────────────────────────────────────────
+        elif st.session_state.mode == "🧬 Analisis MBTI":
+            if st.session_state.current_question_index == -1:
+                st.session_state.question_responses     = []
+                st.session_state.current_question_index = 0
+                q        = MBTI_QUESTIONS[0]
+                response = (f"Oke, yuk kita mulai analisis kepribadianmu! 🎯\n\n"
+                            f"**Pertanyaan {q['id']} dari 10:**\n\n{q['question']}\n\n"
+                            f"**A.** {q['A']}\n**B.** {q['B']}\n\n"
+                            f"Jawab dengan **A** atau **B** ya 😊")
+            else:
+                answer = user_text.strip().upper()
+                if answer in ['A','B']:
+                    idx = st.session_state.current_question_index
+                    q   = MBTI_QUESTIONS[idx]
+                    st.session_state.question_responses.append({
+                        "question_id": q["id"], "answer": answer
+                    })
+                    next_idx = idx + 1
+                    st.session_state.current_question_index = next_idx
+
+                    if next_idx < len(MBTI_QUESTIONS):
+                        nq       = MBTI_QUESTIONS[next_idx]
+                        response = (f"**Pertanyaan {nq['id']} dari 10:**\n\n"
+                                    f"{nq['question']}\n\n"
+                                    f"**A.** {nq['A']}\n**B.** {nq['B']}\n\n"
+                                    f"Jawab dengan **A** atau **B** ya 😊")
+                    else:
+                        mbti_type = analyze_mbti(st.session_state.question_responses)
+                        st.session_state.current_mbti            = mbti_type
+                        st.session_state.current_question_index  = -1
+                        result_text = format_mbti_result(mbti_type)
+                        response = (f"✨ **Analisis selesai!**\n\n{result_text}\n\n---\n"
+                                    f"Sekarang kamu bisa pindah ke mode **Curhat** kalau mau ngobrol santai 😊")
+                else:
+                    response = "Eh, jawabnya A atau B aja ya 😄 Coba lagi!"
+
+            st.session_state.messages.append({'role':'bot','content':response})
+
+        st.rerun()
 
 
 if __name__ == "__main__":
